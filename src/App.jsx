@@ -33,6 +33,7 @@ function Particles() {
       dx: (Math.random() - 0.5) * 0.4,
       dy: (Math.random() - 0.5) * 0.4,
       o: Math.random() * 0.5 + 0.1,
+      isGreen: Math.random() > 0.5,
     }))
     let animId
     function draw() {
@@ -40,7 +41,7 @@ function Particles() {
       particles.forEach(p => {
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(147,197,253,${p.o})`
+        ctx.fillStyle = p.isGreen ? `rgba(74,222,128,${p.o})` : `rgba(147,197,253,${p.o})`
         ctx.fill()
         p.x += p.dx
         p.y += p.dy
@@ -91,11 +92,14 @@ function LoginPage({ onLogin }) {
       <div className="relative z-10 w-full max-w-md px-4">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="bg-blue-600 text-white font-bold text-xl px-4 py-2 rounded-xl">JRS</div>
+            <img
+              src="/logoo-removebg-preview.png"
+              alt="Jupiter Research Services"
+              style={{ height: '80px', objectFit: 'contain' }}
+            />
           </div>
           <h1 className="text-white text-2xl font-bold">Jupiter Research Services</h1>
           <p className="text-blue-300 text-sm mt-1">Global Project Management System</p>
-          <p className="text-blue-400 text-xs mt-1">GMP-Compliant Pharmaceutical ERP / CRM / WMS</p>
         </div>
 
         <div className="rounded-2xl p-8" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)' }}>
@@ -164,7 +168,11 @@ function Dashboard({ activePage, setActivePage, currentUser, onLogout }) {
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-blue-700 text-white px-6 py-3 flex items-center gap-6">
         <div className="flex items-center gap-2 mr-4">
-          <div className="bg-blue-500 text-white font-bold text-sm px-2 py-0.5 rounded">JRS</div>
+          <img
+            src="/logoo-removebg-preview.png"
+            alt="JRS"
+            style={{ height: '30px', objectFit: 'contain' }}
+          />
           <span className="font-bold">GPMS</span>
         </div>
         {navItems.map(item => (
