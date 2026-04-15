@@ -117,7 +117,7 @@ function LoginPage({ onLogin }) {
               <option value="" disabled style={{ background: '#0f1f3d' }}>Select your account...</option>
               {USERS.map(u => (
                 <option key={u.name} value={u.name} style={{ background: '#0f1f3d', color: 'white' }}>
-                  {u.name} — {u.role}
+                  {u.name}
                 </option>
               ))}
             </select>
