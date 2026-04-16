@@ -253,69 +253,159 @@ function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, on
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   const navItems = [
-    { id: 'dashboard',  label: 'Dashboard'  },
-    { id: 'inquiries',  label: 'Inquiries'  },
-    { id: 'masters',    label: 'Masters'    },
-    { id: 'erp',        label: 'ERP'        },
-    { id: 'wms',        label: 'WMS'        },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'inquiries', label: 'Inquiries' },
+    { id: 'masters',   label: 'Masters'   },
+    { id: 'erp',       label: 'ERP'       },
+    { id: 'wms',       label: 'WMS'       },
   ]
 
-  // Company badge color
-  const companyTag = selectedCompany.includes('India') ? 'India'
-    : selectedCompany.includes('BV') ? 'BV' : 'Inc'
-  const tagColor = companyTag === 'India' ? 'bg-orange-500'
-    : companyTag === 'BV' ? 'bg-purple-500' : 'bg-blue-400'
+  const companyTag = selectedCompany.includes('India') ? 'INDIA'
+    : selectedCompany.includes('BV') ? 'BV' : 'INC'
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-blue-700 text-white px-6 py-3 flex items-center gap-6">
-        <div className="flex items-center gap-2 mr-4">
-          <img src="/logoo-removebg-preview.png" alt="JRS" style={{ height: '30px', objectFit: 'contain' }} />
-          <div>
-            <span className="font-bold text-sm">GPMS</span>
-            <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-semibold ${tagColor}`}>{companyTag}</span>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1f3d 100%)' }}>
+
+      {/* ── Navbar wrapper ── */}
+      <div style={{ padding: '8px 16px' }}>
+        <div
+          className="flex items-center gap-2"
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '12px',
+            padding: '6px 16px',
+            height: '48px',
+          }}
+        >
+          {/* ── Logo area ── */}
+          <div className="flex items-center gap-2 mr-4 shrink-0">
+            <img src="/logoo-removebg-preview.png" alt="JRS" style={{ height: '26px', objectFit: 'contain' }} />
+            <span className="font-bold text-white text-sm">GPMS</span>
+            <span style={{
+              background: 'rgba(74,222,128,0.2)',
+              color: '#4ade80',
+              border: '1px solid rgba(74,222,128,0.3)',
+              fontSize: '9px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontWeight: 700,
+              letterSpacing: '0.05em',
+            }}>
+              {companyTag}
+            </span>
+          </div>
+
+          {/* ── Nav items ── */}
+          <div className="flex items-center gap-1">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActivePage(item.id)}
+                style={activePage === item.id ? {
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'white',
+                  fontSize: '13px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                } : {
+                  background: 'transparent',
+                  border: '1px solid transparent',
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '13px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontWeight: 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (activePage !== item.id) {
+                    e.currentTarget.style.color = 'white'
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (activePage !== item.id) {
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── User area ── */}
+          <div className="ml-auto relative shrink-0">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2.5"
+              style={{
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                padding: '5px 12px',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+            >
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                style={{ background: '#1d4ed8' }}>
+                {currentUser?.name?.charAt(0)}
+              </div>
+              <div className="text-left">
+                <p className="leading-none font-medium" style={{ color: 'white', fontSize: '12px' }}>{currentUser?.name}</p>
+                <p className="leading-none mt-0.5" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>{currentUser?.role}</p>
+              </div>
+              <svg className="w-3 h-3 shrink-0" fill="none" stroke="rgba(255,255,255,0.4)" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showUserMenu && (
+              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl w-48 py-1 z-50 border border-gray-100">
+                <div className="px-4 py-2.5 border-b border-gray-100">
+                  <p className="text-xs font-semibold text-gray-800">{currentUser?.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{selectedCompany}</p>
+                </div>
+                <button
+                  onClick={() => { setShowUserMenu(false); onChangePassword() }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                >
+                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Change Password
+                </button>
+                <div className="mx-3 border-t border-gray-100" />
+                <button
+                  onClick={onLogout}
+                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
-        {navItems.map(item => (
-          <span key={item.id} onClick={() => setActivePage(item.id)}
-            className={`cursor-pointer px-3 py-1 rounded transition text-sm ${activePage === item.id ? 'bg-blue-500' : 'hover:text-blue-200'}`}>
-            {item.label}
-          </span>
-        ))}
-
-        <div className="ml-auto relative">
-          <button onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition">
-            <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold">
-              {currentUser?.name?.charAt(0)}
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium leading-none">{currentUser?.name}</p>
-              <p className="text-xs text-blue-300 leading-none mt-0.5">{currentUser?.role}</p>
-            </div>
-            <span className="text-blue-300 text-xs ml-1">▼</span>
-          </button>
-
-          {showUserMenu && (
-            <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg w-48 py-1 z-50">
-              <button onClick={() => { setShowUserMenu(false); onChangePassword() }}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                🔒 Change Password
-              </button>
-              <hr className="my-1" />
-              <button onClick={onLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                Sign Out
-              </button>
-            </div>
-          )}
-        </div>
-      </nav>
-
-      <div>
+      {/* ── Page content ── */}
+      <div style={{ background: '#f1f5f9', borderRadius: '12px 12px 0 0', minHeight: 'calc(100vh - 64px)', marginTop: '0' }}>
         {activePage === 'dashboard' && (
           <div className="p-8">
-            <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
+            <h1 className="text-2xl font-bold mb-1 text-gray-900">Dashboard</h1>
             <p className="text-gray-500">Welcome back, {currentUser?.name}!</p>
             <p className="text-sm text-gray-400 mt-1">{selectedCompany}</p>
           </div>
@@ -323,10 +413,10 @@ function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, on
         {activePage === 'inquiries' && <Inquiries company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'masters'   && <Masters   company={selectedCompany} />}
         {activePage === 'erp' && (
-          <div className="p-8"><h1 className="text-2xl font-bold mb-2">ERP</h1><p className="text-gray-500">Coming soon...</p></div>
+          <div className="p-8"><h1 className="text-2xl font-bold mb-2 text-gray-900">ERP</h1><p className="text-gray-500">Coming soon...</p></div>
         )}
         {activePage === 'wms' && (
-          <div className="p-8"><h1 className="text-2xl font-bold mb-2">WMS</h1><p className="text-gray-500">Coming soon...</p></div>
+          <div className="p-8"><h1 className="text-2xl font-bold mb-2 text-gray-900">WMS</h1><p className="text-gray-500">Coming soon...</p></div>
         )}
       </div>
     </div>
