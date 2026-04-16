@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { supabase } from './supabase'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -81,6 +84,77 @@ function Toast({ toast, onDismiss }) {
       {toast.message}
     </div>
   )
+}
+
+// ── Copy Toast (bottom-center, 2 sec) ─────────────────────────────────────────
+function CopyToast({ show }) {
+  if (!show) return null
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-5 py-3 rounded-xl shadow-2xl text-sm font-medium pointer-events-none select-none bg-gray-900 text-white">
+      <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      </svg>
+      Quote table copied!
+    </div>
+  )
+}
+
+// ── Copy quote helper (accepts array of inquiries) ────────────────────────────
+const SYM = { USD: '$', EUR: '€', GBP: '£', INR: '₹' }
+const TD  = 'style="border:1px solid #ccc;padding:6px;"'
+const TH  = 'style="border:1px solid #ccc;padding:6px;text-align:left;background-color:#f2f2f2;font-weight:bold;"'
+
+async function copyQuoteToClipboard(rows) {
+  const list = Array.isArray(rows) ? rows : [rows]
+
+  const bodyHtml = list.map((inq, i) => {
+    const sym   = SYM[inq.currency] || ''
+    const price = inq.quote_price != null ? `${sym}${Number(inq.quote_price).toLocaleString()}` : ''
+    return `<tr>
+      <td ${TD}>${i + 1}</td>
+      <td ${TD}>${inq.product      || ''}</td>
+      <td ${TD}>${inq.ndc_ma_code  || ''}</td>
+      <td ${TD}>${inq.manufacturer || ''}</td>
+      <td ${TD}>${inq.quantity     != null ? inq.quantity : ''}</td>
+      <td ${TD}>${inq.currency     || ''}</td>
+      <td ${TD}>${price}</td>
+    </tr>`
+  }).join('\n')
+
+  const html = `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">
+  <thead>
+    <tr>
+      <th ${TH}>Sr. No</th>
+      <th ${TH}>Product</th>
+      <th ${TH}>NDC/MA</th>
+      <th ${TH}>Manufacturer</th>
+      <th ${TH}>Qty</th>
+      <th ${TH}>Currency</th>
+      <th ${TH}>Quote Price</th>
+    </tr>
+  </thead>
+  <tbody>
+${bodyHtml}
+  </tbody>
+</table>`
+
+  const plainRows = list.map((inq, i) => {
+    const sym   = SYM[inq.currency] || ''
+    const price = inq.quote_price != null ? `${sym}${Number(inq.quote_price).toLocaleString()}` : ''
+    return [i + 1, inq.product || '', inq.ndc_ma_code || '', inq.manufacturer || '',
+            inq.quantity != null ? inq.quantity : '', inq.currency || '', price].join('\t')
+  })
+  const plain = [
+    ['Sr. No', 'Product', 'NDC/MA', 'Manufacturer', 'Qty', 'Currency', 'Quote Price'].join('\t'),
+    ...plainRows,
+  ].join('\n')
+
+  await navigator.clipboard.write([
+    new ClipboardItem({
+      'text/html':  new Blob([html],  { type: 'text/html'  }),
+      'text/plain': new Blob([plain], { type: 'text/plain' }),
+    }),
+  ])
 }
 
 // ── Delete Modal ──────────────────────────────────────────────────────────────
@@ -483,6 +557,353 @@ function SectionLabel({ children }) {
   )
 }
 
+// ── Date Range Filter ─────────────────────────────────────────────────────────
+function DateRangeFilter({ startDate, endDate, onApply, onClear }) {
+  const [open, setOpen]   = useState(false)
+  const [s, setS]         = useState(startDate || '')
+  const [e, setE]         = useState(endDate   || '')
+  const ref               = useRef(null)
+  const active            = !!(startDate || endDate)
+
+  useEffect(() => {
+    function handler(ev) { if (ref.current && !ref.current.contains(ev.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  function apply() { onApply(s, e); setOpen(false) }
+  function clear()  { setS(''); setE(''); onClear(); setOpen(false) }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition
+          ${active ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'}`}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        Date
+        {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-2 left-0 bg-white border border-gray-100 rounded-2xl shadow-xl z-[80] p-4 w-64">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filter by Date Added</p>
+          <div className="space-y-2.5 mb-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">From</label>
+              <input type="date" value={s} onChange={ev => setS(ev.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">To</label>
+              <input type="date" value={e} onChange={ev => setE(ev.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={clear} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 transition">Clear</button>
+            <button onClick={apply} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-medium transition">Apply</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Inline Status Dropdown ────────────────────────────────────────────────────
+// ── Status portal dropdown (rendered into document.body to escape overflow) ────
+function StatusPortalDropdown({ pos, currentStatus, onPick, onClose }) {
+  const dropRef = useRef(null)
+
+  useEffect(() => {
+    function onMouseDown(e) {
+      if (dropRef.current && !dropRef.current.contains(e.target)) onClose()
+    }
+    function onScroll() { onClose() }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('scroll', onScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('scroll', onScroll, true)
+    }
+  }, [onClose])
+
+  const OPTION_STYLE = {
+    Active:   'text-emerald-700 hover:bg-emerald-50',
+    Inactive: 'text-gray-500   hover:bg-gray-50',
+    Lead:     'text-amber-700  hover:bg-amber-50',
+    Prospect: 'text-blue-700   hover:bg-blue-50',
+  }
+
+  return createPortal(
+    <div
+      ref={dropRef}
+      style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 99999 }}
+      className="bg-white border border-gray-100 rounded-xl shadow-2xl py-1 w-32"
+    >
+      {STATUSES.map(s => (
+        <button
+          key={s}
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
+          onClick={() => onPick(s)}
+          className={`w-full text-left px-3 py-1.5 text-xs font-medium flex items-center gap-2 transition-colors ${OPTION_STYLE[s]} ${s === currentStatus ? 'font-bold' : ''}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[s]}`} />
+          {s}
+          {s === currentStatus && <span className="ml-auto text-[9px] opacity-50">✓</span>}
+        </button>
+      ))}
+    </div>,
+    document.body
+  )
+}
+
+// ── Inline status badge with portal dropdown ──────────────────────────────────
+function InlineStatusBadge({ inq, onStatusChange }) {
+  const [open, setOpen]     = useState(false)
+  const [pos, setPos]       = useState({ top: 0, left: 0 })
+  const [saving, setSaving] = useState(false)
+  const [flash, setFlash]   = useState(false)
+  const btnRef              = useRef(null)
+
+  function handleOpen(e) {
+    e.stopPropagation()
+    if (open) { setOpen(false); return }
+    const rect = btnRef.current.getBoundingClientRect()
+    const dropH = STATUSES.length * 32 + 8
+    const top   = rect.bottom + dropH > window.innerHeight ? rect.top - dropH : rect.bottom + 4
+    setPos({ top, left: rect.left })
+    setOpen(true)
+  }
+
+  async function handlePick(status) {
+    setOpen(false)
+    if (status === inq.status) return
+    setSaving(true)
+    await supabase.from('inquiries').update({ status }).eq('id', inq.id)
+    setSaving(false)
+    setFlash(true)
+    setTimeout(() => setFlash(false), 1200)
+    onStatusChange(inq.id, status)
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={handleOpen}
+        disabled={saving}
+        title="Click to change status"
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium cursor-pointer transition-all
+          ${flash ? 'ring-2 ring-emerald-400 scale-105' : ''}
+          ${STATUS_STYLE[inq.status] || STATUS_STYLE.Inactive}`}
+      >
+        {saving
+          ? <span className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
+          : flash
+            ? <span className="text-emerald-500 font-bold">✓</span>
+            : <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[inq.status] || STATUS_DOT.Inactive}`} />}
+        {inq.status}
+        <svg className="w-2.5 h-2.5 opacity-40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <StatusPortalDropdown
+          pos={pos}
+          currentStatus={inq.status}
+          onPick={handlePick}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  )
+}
+
+// ── Report Modal ──────────────────────────────────────────────────────────────
+const REPORT_TYPES = ['All Inquiries', 'By Customer', 'By Product', 'By Status', 'By Account Manager', 'By Date Range']
+const REPORT_COLS  = [
+  { label: 'Customer',       key: 'customer'        },
+  { label: 'Acct Manager',   key: 'account_manager' },
+  { label: 'Status',         key: 'status'          },
+  { label: 'Date Added',     key: 'date_added'      },
+  { label: 'Country',        key: 'sourcing_country'},
+  { label: 'Product',        key: 'product'         },
+  { label: 'NDC/MA',         key: 'ndc_ma_code'     },
+  { label: 'Manufacturer',   key: 'manufacturer'    },
+  { label: 'Qty',            key: 'quantity'        },
+  { label: 'Currency',       key: 'currency'        },
+  { label: 'Quote Price',    key: 'quote_price'     },
+  { label: 'Purchase Price', key: 'purchase_price'  },
+  { label: 'Supplier',       key: 'supplier'        },
+  { label: 'Margin %',       key: '_margin'         },
+]
+
+function ReportModal({ inquiries, company, masterCustomers, masterProducts, users, onClose }) {
+  const [reportType,  setReportType]  = useState('All Inquiries')
+  const [filterValue, setFilterValue] = useState('')
+  const [startDate,   setStartDate]   = useState('')
+  const [endDate,     setEndDate]     = useState('')
+  const [format,      setFormat]      = useState('pdf')
+  const [generating,  setGenerating]  = useState(false)
+
+  useEffect(() => { setFilterValue('') }, [reportType])
+
+  function getRows() {
+    let rows = [...inquiries]
+    if (reportType === 'By Customer'         && filterValue) rows = rows.filter(r => r.customer        === filterValue)
+    if (reportType === 'By Product'          && filterValue) rows = rows.filter(r => r.product         === filterValue)
+    if (reportType === 'By Status'           && filterValue) rows = rows.filter(r => r.status          === filterValue)
+    if (reportType === 'By Account Manager'  && filterValue) rows = rows.filter(r => r.account_manager === filterValue)
+    if (startDate) rows = rows.filter(r => r.date_added && r.date_added >= startDate)
+    if (endDate)   rows = rows.filter(r => r.date_added && r.date_added <= endDate)
+    return rows.map(r => ({
+      ...r,
+      _margin: calcMargin(r.quote_price, r.purchase_price) != null
+        ? `${calcMargin(r.quote_price, r.purchase_price)}%` : '—',
+      date_added: r.date_added ? new Date(r.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+    }))
+  }
+
+  const safeCompany = company.replace(/[^a-zA-Z0-9]/g, '-')
+  const dateTag     = new Date().toISOString().split('T')[0]
+  const typeTag     = reportType.replace(/\s+/g, '-')
+
+  async function generate() {
+    setGenerating(true)
+    const rows = getRows()
+    const headers = REPORT_COLS.map(c => c.label)
+    const body    = rows.map(r => REPORT_COLS.map(c => {
+      const v = r[c.key]
+      return v != null && v !== '' ? String(v) : '—'
+    }))
+
+    if (format === 'excel') {
+      const wsData = [headers, ...body]
+      const ws     = XLSX.utils.aoa_to_sheet(wsData)
+      // Bold headers + auto column widths
+      const colWidths = headers.map((h, i) => ({
+        wch: Math.max(h.length, ...body.map(row => (row[i] || '').length)) + 2
+      }))
+      ws['!cols'] = colWidths
+      const range = XLSX.utils.decode_range(ws['!ref'])
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })]
+        if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F2' } } }
+      }
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Inquiries')
+      XLSX.writeFile(wb, `JRS-${safeCompany}-Inquiries-${typeTag}-${dateTag}.xlsx`)
+    } else {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+      const titleY = 36
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(company, 40, titleY)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(120)
+      doc.text(`Inquiries Report — ${reportType}`, 40, titleY + 14)
+      doc.text(`Generated: ${new Date().toLocaleString()}  ·  ${rows.length} records`, 40, titleY + 26)
+      doc.setTextColor(0)
+      autoTable(doc, {
+        head: [headers],
+        body,
+        startY: titleY + 40,
+        styles: { fontSize: 7, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 40, right: 40 },
+      })
+      doc.save(`JRS-${safeCompany}-Inquiries-${typeTag}-${dateTag}.pdf`)
+    }
+    setGenerating(false)
+    onClose()
+  }
+
+  const filterOptions = {
+    'By Customer':        masterCustomers.map(c => c.name),
+    'By Product':         masterProducts.map(p => p.name),
+    'By Status':          STATUSES,
+    'By Account Manager': users.map(u => u.name),
+  }
+  const needsFilter = filterOptions[reportType]
+  const previewCount = getRows().length
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Generate Report</h2>
+            <p className="text-gray-400 text-xs mt-0.5">{company}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-xl">×</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Report type */}
+          <Field label="Report Type">
+            <select className={inputCls(false)} value={reportType} onChange={e => setReportType(e.target.value)}>
+              {REPORT_TYPES.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </Field>
+
+          {/* Dynamic filter */}
+          {needsFilter && (
+            <Field label="Filter Value">
+              <select className={inputCls(false)} value={filterValue} onChange={e => setFilterValue(e.target.value)}>
+                <option value="">— All —</option>
+                {filterOptions[reportType].map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+          )}
+
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="From Date (optional)">
+              <input type="date" className={inputCls(false)} value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </Field>
+            <Field label="To Date (optional)">
+              <input type="date" className={inputCls(false)} value={endDate} onChange={e => setEndDate(e.target.value)} />
+            </Field>
+          </div>
+
+          {/* Format */}
+          <Field label="Format">
+            <div className="flex gap-3">
+              {[['pdf', '📄 PDF'], ['excel', '📊 Excel']].map(([val, lbl]) => (
+                <button key={val} onClick={() => setFormat(val)}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition
+                    ${format === val ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <div className="bg-gray-50 rounded-xl px-4 py-2.5 text-xs text-gray-500">
+            <span className="font-semibold text-gray-700">{previewCount}</span> records will be included
+          </div>
+        </div>
+
+        <div className="flex gap-3 px-6 pb-5 pt-0">
+          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+          <button onClick={generate} disabled={generating || previewCount === 0}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+            {generating && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {generating ? 'Generating…' : `Download ${format.toUpperCase()}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Inquiries Component ──────────────────────────────────────────────────
 export default function Inquiries({ company, currentUser }) {
   const [inquiries, setInquiries]   = useState([])
@@ -498,6 +919,11 @@ export default function Inquiries({ company, currentUser }) {
   const [sortDir, setSortDir]       = useState('desc')
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [toast, setToast]           = useState(null)
+  const [copyToast, setCopyToast]   = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [dateStart, setDateStart]   = useState('')
+  const [dateEnd, setDateEnd]       = useState('')
+  const [showReport, setShowReport] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [quickAdd, setQuickAdd]     = useState(null) // { type: 'customer'|'vendor'|'product' }
 
@@ -575,8 +1001,12 @@ export default function Inquiries({ company, currentUser }) {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
     setSaving(true)
+    const autoStatus = form.status === 'Lead' && parseFloat(form.quote_price) > 0
+      ? 'Active' : form.status
+
     const payload = {
       ...form, company,
+      status:         autoStatus,
       quantity:       form.quantity       || null,
       quote_price:    form.quote_price    || null,
       purchase_price: form.purchase_price || null,
@@ -612,6 +1042,32 @@ export default function Inquiries({ company, currentUser }) {
     else { setSortField(field); setSortDir('asc') }
   }
 
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    const activeIds = filtered.filter(r => r.status === 'Active').map(r => r.id)
+    if (activeIds.every(id => selectedIds.has(id))) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(activeIds))
+    }
+  }
+
+  async function copySelected() {
+    const rows = filtered.filter(r => selectedIds.has(r.id) && r.status === 'Active')
+    if (!rows.length) return
+    await copyQuoteToClipboard(rows)
+    setCopyToast(true)
+    setTimeout(() => setCopyToast(false), 2000)
+    setSelectedIds(new Set())
+  }
+
   // ── Quick-add callback ─────────────────────────────────────────────────────
   async function handleQuickAddSave(newEntry) {
     const { type } = quickAdd
@@ -637,12 +1093,20 @@ export default function Inquiries({ company, currentUser }) {
   // ── Computed margin ────────────────────────────────────────────────────────
   const liveMargin = useMemo(() => calcMargin(form.quote_price, form.purchase_price), [form.quote_price, form.purchase_price])
 
+  // ── Inline status update (no modal) ───────────────────────────────────────
+  function handleInlineStatusChange(id, newStatus) {
+    setInquiries(prev => prev.map(r => r.id === id ? { ...r, status: newStatus } : r))
+  }
+
   // ── Filtered + sorted list ─────────────────────────────────────────────────
   const filtered = inquiries
     .filter(c => {
       const q = search.toLowerCase()
       const match = !q || c.customer?.toLowerCase().includes(q) || c.product?.toLowerCase().includes(q) || c.supplier?.toLowerCase().includes(q)
-      return match && (statusFilter === 'All' || c.status === statusFilter)
+      const statusMatch = statusFilter === 'All' || c.status === statusFilter
+      const dateMatch = (!dateStart || (c.date_added && c.date_added >= dateStart))
+                     && (!dateEnd   || (c.date_added && c.date_added <= dateEnd))
+      return match && statusMatch && dateMatch
     })
     .sort((a, b) => {
       const av = (a[sortField] ?? '').toString()
@@ -671,6 +1135,40 @@ export default function Inquiries({ company, currentUser }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Toast toast={toast} onDismiss={() => setToast(null)} />
+      <CopyToast show={copyToast} />
+
+      {/* ── Floating selection action bar ── */}
+      {selectedIds.size > 0 && (() => {
+        const activeCount = filtered.filter(r => selectedIds.has(r.id) && r.status === 'Active').length
+        return (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl"
+            style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <span className="text-white text-sm font-medium whitespace-nowrap">
+              {selectedIds.size} row{selectedIds.size !== 1 ? 's' : ''} selected
+            </span>
+            {activeCount > 0
+              ? <span className="text-emerald-400 text-xs whitespace-nowrap">({activeCount} Active)</span>
+              : <span className="text-amber-400 text-xs whitespace-nowrap">(no Active rows)</span>}
+            <div className="w-px h-4 bg-white/20" />
+            <button
+              onClick={copySelected}
+              disabled={activeCount === 0}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-1.5 rounded-xl transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              Copy Quote Table{activeCount > 0 ? ` (${activeCount})` : ''}
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-white/50 hover:text-white text-sm px-2 py-1.5 rounded-xl hover:bg-white/10 transition"
+            >
+              Clear
+            </button>
+          </div>
+        )
+      })()}
 
       {confirmDelete && (
         <DeleteModal item={confirmDelete} label="Inquiry" onConfirm={handleDelete} onCancel={() => setConfirmDelete(null)} />
@@ -686,10 +1184,21 @@ export default function Inquiries({ company, currentUser }) {
           onSave={handleQuickAddSave} onClose={() => setQuickAdd(null)} />
       )}
 
+      {showReport && (
+        <ReportModal
+          inquiries={inquiries}
+          company={company}
+          masterCustomers={masterCustomers}
+          masterProducts={masterProducts}
+          users={users}
+          onClose={() => setShowReport(false)}
+        />
+      )}
+
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) setImportFile(f); e.target.value = '' }} />
 
-      <div className="max-w-screen-xl mx-auto p-6 space-y-6">
+      <div className="max-w-screen-xl mx-auto space-y-6" style={{ padding: '24px 32px' }}>
 
         {/* ── Header ── */}
         <div className="flex items-start justify-between">
@@ -704,6 +1213,13 @@ export default function Inquiries({ company, currentUser }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               Import Excel / CSV
+            </button>
+            <button onClick={() => setShowReport(true)}
+              className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Generate Report
             </button>
             <button onClick={openAdd}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
@@ -733,7 +1249,13 @@ export default function Inquiries({ company, currentUser }) {
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
             {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">×</button>}
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            <DateRangeFilter
+              startDate={dateStart}
+              endDate={dateEnd}
+              onApply={(s, e) => { setDateStart(s); setDateEnd(e) }}
+              onClear={() => { setDateStart(''); setDateEnd('') }}
+            />
             {['All', ...STATUSES].map(s => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-3.5 py-2.5 rounded-xl text-sm font-medium border transition
@@ -780,19 +1302,37 @@ export default function Inquiries({ company, currentUser }) {
               >
                 <thead>
                   <tr>
-                    {/* ── Frozen Left: Customer header ── */}
+                    {/* ── Frozen Left: Customer header (select-all checkbox embedded) ── */}
                     <th
-                      onClick={() => toggleSort('customer')}
-                      className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap border-b border-r border-gray-100 bg-gray-50"
+                      className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide select-none whitespace-nowrap border-b border-r border-gray-100 bg-gray-50"
                       style={{ position: 'sticky', top: 0, left: 0, zIndex: 30, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
                     >
-                      Customer <SortIcon field="customer" sortField={sortField} sortDir={sortDir} />
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const activeFiltered = filtered.filter(r => r.status === 'Active')
+                          const allSelected = activeFiltered.length > 0 && activeFiltered.every(r => selectedIds.has(r.id))
+                          const someSelected = activeFiltered.some(r => selectedIds.has(r.id))
+                          return activeFiltered.length > 0 ? (
+                            <input
+                              type="checkbox"
+                              title="Select all Active"
+                              className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer shrink-0"
+                              checked={allSelected}
+                              ref={el => { if (el) el.indeterminate = someSelected && !allSelected }}
+                              onChange={toggleSelectAll}
+                            />
+                          ) : null
+                        })()}
+                        <span className="cursor-pointer hover:text-blue-600" onClick={() => toggleSort('customer')}>
+                          Customer <SortIcon field="customer" sortField={sortField} sortDir={sortDir} />
+                        </span>
+                      </div>
                     </th>
 
                     {/* ── Scrollable headers ── */}
                     {[
+                      { label: 'Date Added',      field: 'date_added'       },
                       { label: 'Acct Manager',    field: 'account_manager'  },
-                      { label: 'Status',          field: 'status'           },
                       { label: 'Country',         field: 'sourcing_country' },
                       { label: 'Product',         field: 'product'          },
                       { label: 'NDC / MA Code',   field: 'ndc_ma_code'      },
@@ -803,7 +1343,6 @@ export default function Inquiries({ company, currentUser }) {
                       { label: 'Purchase Price',  field: 'purchase_price'   },
                       { label: 'Supplier',        field: 'supplier'         },
                       { label: 'Margin %',        field: 'quote_price'      },
-                      { label: 'Date Added',      field: 'date_added'       },
                     ].map(({ label, field }) => (
                       <th
                         key={label}
@@ -815,10 +1354,19 @@ export default function Inquiries({ company, currentUser }) {
                       </th>
                     ))}
 
+                    {/* ── Frozen Right: Status header ── */}
+                    <th
+                      onClick={() => toggleSort('status')}
+                      className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap border-b border-l border-gray-100 bg-gray-50"
+                      style={{ position: 'sticky', top: 0, right: 130, zIndex: 30 }}
+                    >
+                      Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} />
+                    </th>
+
                     {/* ── Frozen Right: Actions header ── */}
                     <th
                       className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap border-b border-l border-gray-100 bg-gray-50"
-                      style={{ position: 'sticky', top: 0, right: 0, zIndex: 30, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                      style={{ position: 'sticky', top: 0, right: 0, zIndex: 30, width: 130, minWidth: 130, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}
                     >
                       Actions
                     </th>
@@ -832,14 +1380,22 @@ export default function Inquiries({ company, currentUser }) {
                     return (
                       <tr
                         key={inq.id}
-                        className="group border-b border-gray-50 hover:bg-blue-50 transition-colors"
+                        className={`group border-b border-gray-50 transition-colors ${selectedIds.has(inq.id) ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
                       >
-                        {/* ── Frozen Left: Customer cell ── */}
+                        {/* ── Frozen Left: Customer cell (checkbox only for Active) ── */}
                         <td
-                          className="px-3 py-2 bg-white group-hover:bg-blue-50 border-r border-gray-100 transition-colors"
+                          className={`px-3 py-2 border-r border-gray-100 transition-colors ${selectedIds.has(inq.id) ? 'bg-blue-50' : 'bg-white group-hover:bg-blue-50'}`}
                           style={{ position: 'sticky', left: 0, zIndex: 20, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
                         >
                           <div className="flex items-center gap-2 min-w-[140px]">
+                            {inq.status === 'Active' && (
+                              <input
+                                type="checkbox"
+                                className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer shrink-0"
+                                checked={selectedIds.has(inq.id)}
+                                onChange={() => toggleSelect(inq.id)}
+                              />
+                            )}
                             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
                               {inq.customer?.charAt(0)?.toUpperCase()}
                             </div>
@@ -848,14 +1404,11 @@ export default function Inquiries({ company, currentUser }) {
                         </td>
 
                         {/* ── Scrollable data cells ── */}
+                        <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
+                          {formatDate(inq.date_added)}
+                        </td>
                         <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                           {inq.account_manager || <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_STYLE[inq.status] || STATUS_STYLE.Inactive}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[inq.status] || STATUS_DOT.Inactive}`} />
-                            {inq.status}
-                          </span>
                         </td>
                         <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                           {inq.sourcing_country || <span className="text-gray-300">—</span>}
@@ -893,14 +1446,19 @@ export default function Inquiries({ company, currentUser }) {
                             ? <span className={`font-bold ${parseFloat(margin) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{margin}%</span>
                             : <span className="text-gray-300">—</span>}
                         </td>
-                        <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
-                          {formatDate(inq.date_added)}
+
+                        {/* ── Frozen Right: Status cell ── */}
+                        <td
+                          className={`px-3 py-2 border-l border-gray-100 transition-colors ${selectedIds.has(inq.id) ? 'bg-blue-50' : 'bg-white group-hover:bg-blue-50'}`}
+                          style={{ position: 'sticky', right: 130, zIndex: 20 }}
+                        >
+                          <InlineStatusBadge inq={inq} onStatusChange={handleInlineStatusChange} />
                         </td>
 
                         {/* ── Frozen Right: Actions cell ── */}
                         <td
-                          className="px-3 py-2 bg-white group-hover:bg-blue-50 border-l border-gray-100 transition-colors"
-                          style={{ position: 'sticky', right: 0, zIndex: 20, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                          className={`px-3 py-2 border-l border-gray-100 transition-colors ${selectedIds.has(inq.id) ? 'bg-blue-50' : 'bg-white group-hover:bg-blue-50'}`}
+                          style={{ position: 'sticky', right: 0, zIndex: 20, width: 130, minWidth: 130, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}
                         >
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                             <button

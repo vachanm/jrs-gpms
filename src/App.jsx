@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Inquiries from './Inquiries'
 import Masters from './Masters'
 import { supabase } from './supabase'
@@ -71,6 +72,7 @@ function App() {
         setActivePage={setActivePage}
         currentUser={currentUser}
         selectedCompany={selectedCompany}
+        onCompanyChange={setSelectedCompany}
         onLogout={() => { setPage('login'); setCurrentUser(null); setSelectedCompany('') }}
         onChangePassword={() => setShowChangePassword(true)}
       />
@@ -249,7 +251,110 @@ function ChangePasswordModal({ currentUser, onClose }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, onLogout, onChangePassword }) {
+function CompanyBadge({ selectedCompany, onCompanyChange }) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos]   = useState({ top: 0, left: 0 })
+  const badgeRef        = useRef(null)
+
+  const tag = selectedCompany.includes('India') ? 'INDIA'
+    : selectedCompany.includes('BV') ? 'BV' : 'INC'
+
+  function handleOpen(e) {
+    e.stopPropagation()
+    if (open) { setOpen(false); return }
+    const rect = badgeRef.current.getBoundingClientRect()
+    setPos({ top: rect.bottom + 6, left: rect.left })
+    setOpen(true)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    function close() { setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('scroll', close, true)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('scroll', close, true)
+    }
+  }, [open])
+
+  return (
+    <>
+      <button
+        ref={badgeRef}
+        onClick={handleOpen}
+        className="flex items-center gap-1 cursor-pointer"
+        style={{
+          background: 'rgba(74,222,128,0.2)',
+          color: '#4ade80',
+          border: '1px solid rgba(74,222,128,0.3)',
+          fontSize: '9px',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontWeight: 700,
+          letterSpacing: '0.05em',
+        }}
+      >
+        {tag}
+        <svg style={{ width: 8, height: 8, opacity: 0.7 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && createPortal(
+        <div
+          onMouseDown={e => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 99999,
+            background: 'rgba(15,31,61,0.97)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '10px',
+            minWidth: '220px',
+            padding: '4px',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+          }}
+        >
+          {COMPANIES.map(c => (
+            <button
+              key={c}
+              onClick={() => { onCompanyChange(c); setOpen(false) }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '100%',
+                textAlign: 'left',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: 'white',
+                background: c === selectedCompany ? 'rgba(255,255,255,0.1)' : 'transparent',
+                cursor: 'pointer',
+                border: 'none',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { if (c !== selectedCompany) e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+              onMouseLeave={e => { if (c !== selectedCompany) e.currentTarget.style.background = 'transparent' }}
+            >
+              <span style={{ flex: 1 }}>{c}</span>
+              {c === selectedCompany && (
+                <svg style={{ width: 12, height: 12, color: '#4ade80', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
+function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword }) {
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   const navItems = [
@@ -259,9 +364,6 @@ function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, on
     { id: 'erp',       label: 'ERP'       },
     { id: 'wms',       label: 'WMS'       },
   ]
-
-  const companyTag = selectedCompany.includes('India') ? 'INDIA'
-    : selectedCompany.includes('BV') ? 'BV' : 'INC'
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1f3d 100%)' }}>
@@ -282,18 +384,7 @@ function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, on
           <div className="flex items-center gap-2 mr-4 shrink-0">
             <img src="/logoo-removebg-preview.png" alt="JRS" style={{ height: '26px', objectFit: 'contain' }} />
             <span className="font-bold text-white text-sm">GPMS</span>
-            <span style={{
-              background: 'rgba(74,222,128,0.2)',
-              color: '#4ade80',
-              border: '1px solid rgba(74,222,128,0.3)',
-              fontSize: '9px',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-            }}>
-              {companyTag}
-            </span>
+            <CompanyBadge selectedCompany={selectedCompany} onCompanyChange={onCompanyChange} />
           </div>
 
           {/* ── Nav items ── */}
