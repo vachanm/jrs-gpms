@@ -47,22 +47,34 @@ function Particles() {
 }
 
 function App() {
-  const [page, setPage]                   = useState('login')
   const [activePage, setActivePage]       = useState('dashboard')
-  const [currentUser, setCurrentUser]     = useState(null)
-  const [selectedCompany, setSelectedCompany] = useState('')
   const [showChangePassword, setShowChangePassword] = useState(false)
 
-  if (page === 'login') {
-    return (
-      <LoginPage
-        onLogin={(user, company) => {
-          setCurrentUser(user)
-          setSelectedCompany(company)
-          setPage('dashboard')
-        }}
-      />
-    )
+  // Restore session from localStorage on first load
+  const savedUser    = (() => { try { return JSON.parse(localStorage.getItem('jrs_user'))    } catch { return null } })()
+  const savedCompany = (() => { try { return JSON.parse(localStorage.getItem('jrs_company')) } catch { return null } })()
+
+  const [currentUser, setCurrentUser]         = useState(savedUser)
+  const [selectedCompany, setSelectedCompany] = useState(savedCompany || '')
+
+  const isLoggedIn = !!(currentUser && selectedCompany)
+
+  function handleLogin(user, company) {
+    localStorage.setItem('jrs_user',    JSON.stringify(user))
+    localStorage.setItem('jrs_company', JSON.stringify(company))
+    setCurrentUser(user)
+    setSelectedCompany(company)
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('jrs_user')
+    localStorage.removeItem('jrs_company')
+    setCurrentUser(null)
+    setSelectedCompany('')
+  }
+
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} />
   }
 
   return (
@@ -71,9 +83,13 @@ function App() {
         activePage={activePage}
         setActivePage={setActivePage}
         currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
         selectedCompany={selectedCompany}
-        onCompanyChange={setSelectedCompany}
-        onLogout={() => { setPage('login'); setCurrentUser(null); setSelectedCompany('') }}
+        onCompanyChange={company => {
+          localStorage.setItem('jrs_company', JSON.stringify(company))
+          setSelectedCompany(company)
+        }}
+        onLogout={handleLogout}
         onChangePassword={() => setShowChangePassword(true)}
       />
       {showChangePassword && (
@@ -354,8 +370,95 @@ function CompanyBadge({ selectedCompany, onCompanyChange }) {
   )
 }
 
-function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword }) {
-  const [showUserMenu, setShowUserMenu] = useState(false)
+// ── My Profile Modal ──────────────────────────────────────────────────────────
+function MyProfileModal({ currentUser, selectedCompany, onClose, onNameUpdate }) {
+  const [name, setName]       = useState(currentUser.name)
+  const [saving, setSaving]   = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError]     = useState('')
+
+  async function handleSave() {
+    const trimmed = name.trim()
+    if (!trimmed) return setError('Name cannot be empty.')
+    if (trimmed === currentUser.name) { onClose(); return }
+    setSaving(true); setError('')
+    const { error: err } = await supabase.from('users').update({ name: trimmed }).eq('id', currentUser.id)
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    // Persist updated name in localStorage
+    const updated = { ...currentUser, name: trimmed }
+    localStorage.setItem('jrs_user', JSON.stringify(updated))
+    onNameUpdate(updated)
+    setSuccess(true)
+    setTimeout(onClose, 1200)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">My Profile</h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-xl transition">×</button>
+        </div>
+        <div className="px-6 py-6 space-y-5">
+          {/* Avatar */}
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+              style={{ background: 'linear-gradient(135deg, #1d4ed8, #2563eb)' }}>
+              {name.charAt(0).toUpperCase()}
+            </div>
+          </div>
+          {/* Name */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Full Name</label>
+            <input
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              value={name}
+              onChange={e => { setName(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              autoFocus
+            />
+          </div>
+          {/* Role + Company badges */}
+          <div className="flex gap-2 flex-wrap">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+              {currentUser.role}
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+              {selectedCompany}
+            </span>
+          </div>
+          {error   && <p className="text-red-500 text-sm">{error}</p>}
+          {success && <p className="text-emerald-600 text-sm font-medium">✓ Profile updated!</p>}
+        </div>
+        <div className="flex gap-3 px-6 pb-6">
+          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+          <button onClick={handleSave} disabled={saving || success}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+            {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword }) {
+  const [showUserMenu, setShowUserMenu]   = useState(false)
+  const [showProfile, setShowProfile]     = useState(false)
+  const dropdownRef                       = useRef(null)
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowUserMenu(false)
+      }
+    }
+    if (showUserMenu) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showUserMenu])
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -433,7 +536,7 @@ function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, on
           </div>
 
           {/* ── User area ── */}
-          <div className="ml-auto relative shrink-0">
+          <div className="ml-auto relative shrink-0" ref={dropdownRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2.5"
@@ -462,11 +565,20 @@ function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, on
             </button>
 
             {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl w-48 py-1 z-50 border border-gray-100">
+              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl w-52 py-1 z-50 border border-gray-100">
                 <div className="px-4 py-2.5 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-800">{currentUser?.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{selectedCompany}</p>
                 </div>
+                <button
+                  onClick={() => { setShowUserMenu(false); setShowProfile(true) }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                >
+                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  My Profile
+                </button>
                 <button
                   onClick={() => { setShowUserMenu(false); onChangePassword() }}
                   className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
@@ -491,6 +603,15 @@ function Dashboard({ activePage, setActivePage, currentUser, selectedCompany, on
           </div>
         </div>
       </div>
+
+      {showProfile && (
+        <MyProfileModal
+          currentUser={currentUser}
+          selectedCompany={selectedCompany}
+          onClose={() => setShowProfile(false)}
+          onNameUpdate={setCurrentUser}
+        />
+      )}
 
       {/* ── Page content ── */}
       <div style={{ background: '#f1f5f9', borderRadius: '12px 12px 0 0', minHeight: 'calc(100vh - 64px)', marginTop: '0' }}>
