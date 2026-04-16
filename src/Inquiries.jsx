@@ -80,7 +80,9 @@ function Toast({ toast, onDismiss }) {
   return (
     <div className={`fixed top-5 right-5 z-[200] flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-2xl text-sm font-medium pointer-events-none select-none
       ${toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-      <span>{toast.type === 'success' ? '✓' : '✕'}</span>
+      {toast.type === 'success'
+        ? <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+        : <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>}
       {toast.message}
     </div>
   )
@@ -253,9 +255,9 @@ function QuickAddModal({ type, company, onSave, onClose }) {
   const [saving, setSaving]     = useState(false)
 
   const config = {
-    customer: { table: 'customers_master', label: 'Customer',  icon: '👥' },
-    vendor:   { table: 'vendors_master',   label: 'Vendor',    icon: '🏭' },
-    product:  { table: 'products_master',  label: 'Product',   icon: '💊' },
+    customer: { table: 'customers_master', label: 'Customer', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> },
+    vendor:   { table: 'vendors_master',   label: 'Vendor',   icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg> },
+    product:  { table: 'products_master',  label: 'Product',  icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg> },
   }[type]
 
   useEffect(() => {
@@ -277,8 +279,10 @@ function QuickAddModal({ type, company, onSave, onClose }) {
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
-          <h3 className="font-bold text-gray-900 text-base">{config.icon} Add New {config.label}</h3>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-xl">×</button>
+          <h3 className="font-bold text-gray-900 text-base flex items-center gap-1.5">{config.icon}<span>Add New {config.label}</span></h3>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
         <div className="px-5 py-4 space-y-3">
           <Field label={`${config.label} Name *`}>
@@ -415,7 +419,9 @@ function ImportModal({ file, company, onClose, onImported }) {
               {step === 'preview' && 'Review before importing'}
             </p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-xl">×</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5">
@@ -427,7 +433,11 @@ function ImportModal({ file, company, onClose, onImported }) {
           )}
           {step === 'error' && (
             <div className="text-center py-16">
-              <p className="text-4xl mb-3">⚠️</p>
+              <div className="flex justify-center mb-3">
+                <svg className="w-12 h-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
               <p className="font-semibold text-gray-800 mb-1">Could not read file</p>
               <p className="text-gray-400 text-sm">{parseError}</p>
             </div>
@@ -444,7 +454,10 @@ function ImportModal({ file, company, onClose, onImported }) {
                       {key.replace(/_/g, ' ')}
                       {key === 'customer' && <span className="text-red-500 ml-1">*</span>}
                       {mapping[key]
-                        ? <span className="ml-2 text-emerald-600 font-normal normal-case">✓ auto-detected</span>
+                        ? <span className="ml-2 text-emerald-600 font-normal normal-case inline-flex items-center gap-0.5">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                            auto-detected
+                          </span>
                         : <span className="ml-2 text-amber-500 font-normal normal-case">— not detected</span>}
                     </label>
                     <select className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
@@ -485,10 +498,16 @@ function ImportModal({ file, company, onClose, onImported }) {
                       <tr key={i} className={!row._ok ? 'bg-red-50/60' : row._warnings.length ? 'bg-amber-50/40' : ''}>
                         <td className="px-3 py-2.5">
                           {!row._ok
-                            ? <span className="text-red-600 font-medium">✕ Skip</span>
+                            ? <span className="text-red-600 font-medium flex items-center gap-1">
+                                <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>Skip
+                              </span>
                             : row._warnings.length
-                              ? <span className="text-amber-600 font-medium">⚠ Warn</span>
-                              : <span className="text-emerald-600 font-medium">✓ OK</span>}
+                              ? <span className="text-amber-600 font-medium flex items-center gap-1">
+                                  <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>Warn
+                                </span>
+                              : <span className="text-emerald-600 font-medium flex items-center gap-1">
+                                  <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>OK
+                                </span>}
                         </td>
                         <td className="px-3 py-2.5 font-medium text-gray-800">{row.customer || <span className="text-red-400 italic">missing</span>}</td>
                         <td className="px-3 py-2.5 text-gray-500">{row.product || '—'}</td>
@@ -653,7 +672,7 @@ function StatusPortalDropdown({ pos, currentStatus, onPick, onClose }) {
         >
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[s]}`} />
           {s}
-          {s === currentStatus && <span className="ml-auto text-[9px] opacity-50">✓</span>}
+          {s === currentStatus && <svg className="ml-auto w-3 h-3 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>}
         </button>
       ))}
     </div>,
@@ -704,7 +723,7 @@ function InlineStatusBadge({ inq, onStatusChange }) {
         {saving
           ? <span className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
           : flash
-            ? <span className="text-emerald-500 font-bold">✓</span>
+            ? <svg className="w-2.5 h-2.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
             : <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[inq.status] || STATUS_DOT.Inactive}`} />}
         {inq.status}
         <svg className="w-2.5 h-2.5 opacity-40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -842,7 +861,9 @@ function ReportModal({ inquiries, company, masterCustomers, masterProducts, user
             <h2 className="text-lg font-bold text-gray-900">Generate Report</h2>
             <p className="text-gray-400 text-xs mt-0.5">{company}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-xl">×</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
@@ -876,13 +897,22 @@ function ReportModal({ inquiries, company, masterCustomers, masterProducts, user
           {/* Format */}
           <Field label="Format">
             <div className="flex gap-3">
-              {[['pdf', '📄 PDF'], ['excel', '📊 Excel']].map(([val, lbl]) => (
-                <button key={val} onClick={() => setFormat(val)}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition
-                    ${format === val ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}>
-                  {lbl}
-                </button>
-              ))}
+              <button onClick={() => setFormat('pdf')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition flex items-center justify-center gap-1.5
+                  ${format === 'pdf' ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                PDF
+              </button>
+              <button onClick={() => setFormat('excel')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition flex items-center justify-center gap-1.5
+                  ${format === 'excel' ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 3v18M6 3h12a1 1 0 011 1v16a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                </svg>
+                Excel
+              </button>
             </div>
           </Field>
 
@@ -1233,10 +1263,14 @@ export default function Inquiries({ company, currentUser }) {
 
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Inquiries" value={stats.total}     accent="bg-blue-50"    icon="📋" />
-          <StatCard label="Active"          value={stats.active}    accent="bg-emerald-50" icon="✅" />
-          <StatCard label="Leads"           value={stats.leads}     accent="bg-amber-50"   icon="🎯" />
-          <StatCard label="Prospects"       value={stats.prospects} accent="bg-purple-50"  icon="🔍" />
+          <StatCard label="Total Inquiries" value={stats.total}     accent="bg-blue-50 text-blue-600"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>} />
+          <StatCard label="Active"          value={stats.active}    accent="bg-emerald-50 text-emerald-600"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+          <StatCard label="Leads"           value={stats.leads}     accent="bg-amber-50 text-amber-600"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>} />
+          <StatCard label="Prospects"       value={stats.prospects} accent="bg-purple-50 text-purple-600"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>} />
         </div>
 
         {/* ── Search & Filter ── */}
@@ -1247,7 +1281,9 @@ export default function Inquiries({ company, currentUser }) {
             </svg>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by customer, product or supplier…"
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
-            {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">×</button>}
+            {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>}
           </div>
           <div className="flex gap-2 flex-wrap items-center">
             <DateRangeFilter
@@ -1274,7 +1310,11 @@ export default function Inquiries({ company, currentUser }) {
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
-            <p className="text-4xl mb-3">{inquiries.length === 0 ? '📋' : '🔍'}</p>
+            <div className="flex justify-center mb-3">
+              {inquiries.length === 0
+                ? <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                : <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+            </div>
             <p className="text-gray-800 font-medium">{inquiries.length === 0 ? 'No inquiries yet' : 'No results found'}</p>
             <p className="text-gray-400 text-sm mt-1">{inquiries.length === 0 ? 'Click "Add Inquiry" to get started.' : 'Try adjusting your search or filters.'}</p>
           </div>
@@ -1502,7 +1542,9 @@ export default function Inquiries({ company, currentUser }) {
                 <h2 className="text-lg font-bold text-gray-900">{editing ? 'Edit Inquiry' : 'New Inquiry'}</h2>
                 <p className="text-gray-400 text-xs mt-0.5">{company}</p>
               </div>
-              <button onClick={closeForm} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition text-xl">×</button>
+              <button onClick={closeForm} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
 
             {/* Body */}

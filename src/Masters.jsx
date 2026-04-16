@@ -6,7 +6,8 @@ const MASTERS = {
   customers: {
     label: 'Customer Master',
     table: 'customers_master',
-    icon:  '👥',
+    color: 'text-blue-600 bg-blue-50',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
     fields: [
       { key: 'name', label: 'Customer Name', required: true, placeholder: 'e.g. Pharma Corp Ltd' },
     ],
@@ -18,7 +19,8 @@ const MASTERS = {
   vendors: {
     label: 'Vendor Master',
     table: 'vendors_master',
-    icon:  '🏭',
+    color: 'text-purple-600 bg-purple-50',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
     fields: [
       { key: 'name', label: 'Vendor Name', required: true, placeholder: 'e.g. Global Supplies Inc' },
     ],
@@ -30,7 +32,8 @@ const MASTERS = {
   products: {
     label: 'Product Master',
     table: 'products_master',
-    icon:  '💊',
+    color: 'text-emerald-600 bg-emerald-50',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>,
     fields: [
       { key: 'name',         label: 'Product Name',   required: true, placeholder: 'e.g. Paracetamol 500mg' },
       { key: 'ndc_ma_code',  label: 'NDC / MA Code',  required: false, placeholder: 'e.g. NDC 12345-678' },
@@ -46,7 +49,8 @@ const MASTERS = {
   storage: {
     label: 'Storage Master',
     table: 'storage_master',
-    icon:  '🏪',
+    color: 'text-amber-600 bg-amber-50',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
     fields: [
       { key: 'name',     label: 'Storage Name', required: true, placeholder: 'e.g. Warehouse A' },
       { key: 'location', label: 'Location',     required: false, placeholder: 'e.g. Amsterdam, NL' },
@@ -76,7 +80,9 @@ function Toast({ toast, onDismiss }) {
   return (
     <div className={`fixed top-5 right-5 z-[200] flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-2xl text-sm font-medium pointer-events-none select-none
       ${toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-      <span>{toast.type === 'success' ? '✓' : '✕'}</span>
+      {toast.type === 'success'
+        ? <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+        : <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>}
       {toast.message}
     </div>
   )
@@ -214,8 +220,8 @@ function MasterSection({ masterKey, company, showToast }) {
 
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{cfg.icon}</span>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cfg.color}`}>{cfg.icon}</div>
           <div>
             <h2 className="text-lg font-bold text-gray-900">{cfg.label}</h2>
             <p className="text-gray-400 text-xs">{entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} for {company}</p>
@@ -238,7 +244,9 @@ function MasterSection({ masterKey, company, showToast }) {
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder={`Search ${cfg.label.toLowerCase()}…`}
           className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" />
-        {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">×</button>}
+        {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>}
       </div>
 
       {/* Table */}
@@ -249,7 +257,7 @@ function MasterSection({ masterKey, company, showToast }) {
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
-          <p className="text-3xl mb-3">{cfg.icon}</p>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 [&_svg]:w-8 [&_svg]:h-8 ${cfg.color}`}>{cfg.icon}</div>
           <p className="text-gray-800 font-medium">{entries.length === 0 ? `No ${cfg.label.toLowerCase()} yet` : 'No results found'}</p>
           <p className="text-gray-400 text-sm mt-1">{entries.length === 0 ? 'Click "Add Entry" to get started.' : 'Try adjusting your search.'}</p>
         </div>
@@ -320,7 +328,9 @@ function MasterSection({ masterKey, company, showToast }) {
                 <h2 className="text-lg font-bold text-gray-900">{editing ? 'Edit Entry' : `New ${cfg.label.split(' ')[0]}`}</h2>
                 <p className="text-gray-400 text-xs mt-0.5">{cfg.label}</p>
               </div>
-              <button onClick={closeForm} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-xl transition">×</button>
+              <button onClick={closeForm} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
 
             <div className="px-6 py-5 space-y-4">
@@ -380,7 +390,7 @@ export default function Masters({ company }) {
                 ${activeTab === tab.key
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
-              <span className="text-base">{tab.icon}</span>
+              {tab.icon}
               <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
