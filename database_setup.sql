@@ -25,10 +25,27 @@ create table if not exists inquiries (
 
 -- Customer Master
 create table if not exists customers_master (
-  id         uuid primary key default gen_random_uuid(),
-  name       text not null,
-  company    text,
-  created_at timestamptz default now()
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  address1       text,
+  address2       text,
+  country        text,
+  state          text,
+  postal_code    text,
+  website        text,
+  contact1_name  text,
+  contact1_email text,
+  contact1_phone text,
+  contact2_name  text,
+  contact2_email text,
+  contact2_phone text,
+  contact3_name  text,
+  contact3_email text,
+  contact3_phone text,
+  approved_date  date,
+  remarks        text,
+  company        text,
+  created_at     timestamptz default now()
 );
 
 -- Vendor Master
