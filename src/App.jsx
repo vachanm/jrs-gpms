@@ -115,11 +115,18 @@ function App() {
 }
 
 // ── Login Page ────────────────────────────────────────────────────────────────
+const COMPANY_LABELS = [
+  { value: 'Jupiter Research Services Inc',    label: 'Inc',    sub: 'North America' },
+  { value: 'Jupiter Research Services BV',     label: 'BV',     sub: 'Europe'        },
+  { value: 'Jupiter Research Services India',  label: 'India',  sub: 'Asia Pacific'  },
+]
+
 function LoginPage({ onLogin }) {
   const [selectedCompany, setSelectedCompany] = useState('')
   const [users, setUsers]         = useState([])
   const [selectedUser, setSelectedUser] = useState('')
   const [password, setPassword]   = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError]         = useState('')
   const [loading, setLoading]     = useState(false)
 
@@ -139,7 +146,7 @@ function LoginPage({ onLogin }) {
     onLogin(data, selectedCompany)
   }
 
-  const selectStyle = {
+  const fieldStyle = {
     background: 'rgba(255,255,255,0.08)',
     border: '1px solid rgba(255,255,255,0.15)',
   }
@@ -163,20 +170,27 @@ function LoginPage({ onLogin }) {
           <h2 className="text-white text-2xl font-bold mb-1">Sign In</h2>
           <p className="text-blue-300 text-sm mb-6">Select your company and account to continue.</p>
 
-          {/* Company Selector */}
-          <div className="mb-4">
-            <label className="block text-blue-200 text-sm font-medium mb-1.5">Company</label>
-            <select
-              value={selectedCompany}
-              onChange={e => { setSelectedCompany(e.target.value); setError('') }}
-              className="w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={{ ...selectStyle, color: selectedCompany ? 'white' : 'rgba(255,255,255,0.4)' }}
-            >
-              <option value="" disabled style={{ background: '#0f1f3d' }}>Select company...</option>
-              {COMPANIES.map(c => (
-                <option key={c} value={c} style={{ background: '#0f1f3d', color: 'white' }}>{c}</option>
-              ))}
-            </select>
+          {/* Company Cards */}
+          <div className="mb-5">
+            <label className="block text-blue-200 text-sm font-medium mb-2">Company</label>
+            <div className="grid grid-cols-3 gap-2">
+              {COMPANY_LABELS.map(c => {
+                const active = selectedCompany === c.value
+                return (
+                  <button key={c.value} type="button"
+                    onClick={() => { setSelectedCompany(c.value); setError('') }}
+                    className="rounded-xl py-3 px-2 text-center transition-all duration-150 cursor-pointer"
+                    style={{
+                      background: active ? 'rgba(43,125,233,0.25)' : 'rgba(255,255,255,0.06)',
+                      border: active ? '1px solid rgba(43,125,233,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                      boxShadow: active ? '0 0 0 2px rgba(43,125,233,0.2)' : 'none',
+                    }}>
+                    <div className="text-white font-semibold text-sm">{c.label}</div>
+                    <div className="text-blue-400 text-xs mt-0.5">{c.sub}</div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* User Account Selector */}
@@ -186,7 +200,7 @@ function LoginPage({ onLogin }) {
               value={selectedUser}
               onChange={e => { setSelectedUser(e.target.value); setError('') }}
               className="w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={{ ...selectStyle, color: selectedUser ? 'white' : 'rgba(255,255,255,0.4)' }}
+              style={{ ...fieldStyle, color: selectedUser ? 'white' : 'rgba(255,255,255,0.4)' }}
             >
               <option value="" disabled style={{ background: '#0f1f3d' }}>Select your account...</option>
               {users.map(u => (
@@ -198,29 +212,48 @@ function LoginPage({ onLogin }) {
           {/* Password */}
           <div className="mb-6">
             <label className="block text-blue-200 text-sm font-medium mb-1.5">Password</label>
-            <input
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              className="w-full rounded-lg px-4 py-2.5 text-sm text-white placeholder-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={selectStyle}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                className="w-full rounded-lg px-4 py-2.5 pr-10 text-sm text-white placeholder-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={fieldStyle}
+              />
+              <button type="button" onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-200 transition-colors">
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7s4-7 9-7a9.96 9.96 0 015.43 1.6M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
           <button onClick={handleLogin} disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-semibold text-sm transition-all duration-200"
-            style={{ opacity: loading ? 0.7 : 1 }}>
+            className="w-full text-white py-2.5 rounded-lg font-semibold text-sm transition-all duration-200"
+            style={{
+              background: 'linear-gradient(90deg, #2B7DE9, #28A865)',
+              opacity: loading ? 0.7 : 1,
+            }}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
-        </div>
 
-        <p className="text-center text-blue-500 text-xs mt-6">
-          21 CFR Part 11 compliant · Electronic Signatures Required · All actions are audited
-        </p>
+          <p className="text-center text-blue-500/50 text-xs mt-5">
+            21 CFR Part 11 compliant · Electronic Signatures Required · All actions are audited
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -278,6 +311,178 @@ function ChangePasswordModal({ currentUser, onClose }) {
         )}
       </div>
     </div>
+  )
+}
+
+// ── Feedback Widget ───────────────────────────────────────────────────────────
+const FEEDBACK_CATS = ['💡 Feature', '🐛 Bug', '💬 General']
+
+function FeedbackWidget({ currentUser, company, theme }) {
+  const [open, setOpen]         = useState(false)
+  const [category, setCategory] = useState('💬 General')
+  const [message, setMessage]   = useState('')
+  const [sending, setSending]   = useState(false)
+  const [sent, setSent]         = useState(false)
+  const wrapRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const fn = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const fn = e => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [open])
+
+  async function handleSubmit() {
+    if (!message.trim()) return
+    setSending(true)
+    await supabase.from('feedback').insert({
+      user_name: currentUser?.name,
+      user_id:   currentUser?.id,
+      company,
+      category,
+      message:   message.trim(),
+    })
+    setSending(false)
+    setSent(true)
+    setTimeout(() => { setSent(false); setOpen(false); setMessage(''); setCategory('💬 General') }, 2500)
+  }
+
+  const dark = theme === 'dark'
+
+  const panel = open && (
+    <div style={{
+      position: 'absolute', bottom: 52, right: 0,
+      width: 308,
+      background: dark ? '#0d1b35' : '#ffffff',
+      border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'}`,
+      borderRadius: 18,
+      boxShadow: '0 12px 48px rgba(0,0,0,0.18)',
+      overflow: 'hidden',
+    }}>
+      {sent ? (
+        <div style={{ padding: 28, textAlign: 'center' }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(40,168,101,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+            <svg style={{ width: 22, height: 22, color: '#28A865' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <p style={{ fontWeight: 700, fontSize: 14, color: dark ? '#f1f5f9' : '#111827', margin: 0 }}>Got it, thanks!</p>
+          <p style={{ fontSize: 12, color: dark ? 'rgba(255,255,255,0.45)' : '#9ca3af', margin: '4px 0 0' }}>Your feedback has been sent.</p>
+        </div>
+      ) : (
+        <>
+          {/* Header */}
+          <div style={{ padding: '16px 20px 14px', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : '#f3f4f6'}` }}>
+            <p style={{ fontWeight: 700, fontSize: 13, color: dark ? '#f1f5f9' : '#111827', margin: 0 }}>Feedback & Ideas</p>
+            <p style={{ fontSize: 11, color: dark ? 'rgba(255,255,255,0.4)' : '#9ca3af', margin: '3px 0 0' }}>
+              Feature requests, bugs, or just ask — we read everything!
+            </p>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Category pills */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {FEEDBACK_CATS.map(c => (
+                <button key={c} onClick={() => setCategory(c)} style={{
+                  padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 500,
+                  cursor: 'pointer', transition: 'all 0.12s',
+                  background: category === c ? '#2B7DE9' : dark ? 'rgba(255,255,255,0.07)' : '#f3f4f6',
+                  color: category === c ? 'white' : dark ? 'rgba(255,255,255,0.6)' : '#6b7280',
+                  border: category === c ? '1px solid #2B7DE9' : `1px solid ${dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'}`,
+                }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              autoFocus
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit() }}
+              placeholder="What's on your mind?"
+              rows={4}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                border: `1px solid ${dark ? 'rgba(255,255,255,0.12)' : '#e5e7eb'}`,
+                borderRadius: 12, padding: '10px 12px',
+                fontSize: 13, resize: 'none',
+                background: dark ? 'rgba(255,255,255,0.04)' : '#fafafa',
+                color: dark ? '#f1f5f9' : '#111827',
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+              onFocus={e => e.target.style.borderColor = '#2B7DE9'}
+              onBlur={e => e.target.style.borderColor = dark ? 'rgba(255,255,255,0.12)' : '#e5e7eb'}
+            />
+
+            {/* Footer row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, color: dark ? 'rgba(255,255,255,0.35)' : '#9ca3af' }}>
+                {currentUser?.name} · {company?.split(' ').pop()}
+              </span>
+              <button onClick={handleSubmit} disabled={!message.trim() || sending}
+                style={{
+                  background: '#2B7DE9', color: 'white',
+                  border: 'none', borderRadius: 10,
+                  padding: '7px 16px', fontSize: 12, fontWeight: 600,
+                  cursor: message.trim() && !sending ? 'pointer' : 'not-allowed',
+                  opacity: !message.trim() || sending ? 0.45 : 1,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  transition: 'opacity 0.15s',
+                }}>
+                {sending && <span style={{ width: 11, height: 11, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />}
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+            <p style={{ fontSize: 10, color: dark ? 'rgba(255,255,255,0.25)' : '#d1d5db', margin: 0, textAlign: 'right' }}>
+              ⌘ + Enter to send
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  )
+
+  return createPortal(
+    <div ref={wrapRef} style={{ position: 'fixed', bottom: 22, right: 22, zIndex: 99999 }}>
+      {panel}
+      <button
+        onClick={() => setOpen(v => !v)}
+        title="Feedback & Ideas"
+        style={{
+          width: 38, height: 38, borderRadius: '50%',
+          background: open ? '#2B7DE9' : '#0a1628',
+          border: '1.5px solid rgba(255,255,255,0.18)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 4px 18px rgba(0,0,0,0.28)',
+          transition: 'background 0.15s, transform 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+      >
+        {open ? (
+          <svg style={{ width: 15, height: 15, color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg style={{ width: 16, height: 16, color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+        )}
+      </button>
+    </div>,
+    document.body
   )
 }
 
@@ -410,6 +615,19 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
   const [showCompanyPicker, setShowCompanyPicker] = useState(false)
   const userMenuRef   = useRef(null)
   const companyRef    = useRef(null)
+  const sidebarRef    = useRef(null)
+
+  // Collapse sidebar when clicking outside it (on main content)
+  useEffect(() => {
+    if (collapsed) return
+    function handleClickOutside(e) {
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
+        setCollapsed(true)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [collapsed])
 
   useEffect(() => {
     if (!showUserMenu) return
@@ -464,15 +682,19 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
     <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{
-        width: W, minWidth: W, maxWidth: W,
-        background: '#0a1628',
-        display: 'flex', flexDirection: 'column',
-        transition: 'width 0.22s ease, min-width 0.22s ease, max-width 0.22s ease',
-        borderRight: '1px solid rgba(255,255,255,0.07)',
-        overflow: 'hidden',
-        flexShrink: 0,
-      }}>
+      <aside
+        ref={sidebarRef}
+        onClick={e => { if (collapsed && !e.target.closest('button, a, input, select')) setCollapsed(false) }}
+        style={{
+          width: W, minWidth: W, maxWidth: W,
+          background: '#0a1628',
+          display: 'flex', flexDirection: 'column',
+          transition: 'width 0.22s ease, min-width 0.22s ease, max-width 0.22s ease',
+          borderRight: '1px solid rgba(255,255,255,0.07)',
+          overflow: 'hidden',
+          flexShrink: 0,
+          cursor: collapsed ? 'pointer' : 'default',
+        }}>
 
         {/* Logo */}
         <div style={{
@@ -762,6 +984,8 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
         <MyProfileModal currentUser={currentUser} selectedCompany={selectedCompany}
           onClose={() => setShowProfile(false)} onNameUpdate={setCurrentUser} />
       )}
+
+      <FeedbackWidget currentUser={currentUser} company={selectedCompany} theme={theme} />
     </div>
   )
 }
