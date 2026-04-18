@@ -25,28 +25,36 @@ create table if not exists inquiries (
 
 -- Customer Master
 create table if not exists customers_master (
-  id             uuid primary key default gen_random_uuid(),
-  name           text not null,
-  address1       text,
-  address2       text,
-  country        text,
-  state          text,
-  postal_code    text,
-  website        text,
-  contact1_name  text,
-  contact1_email text,
-  contact1_phone text,
-  contact2_name  text,
-  contact2_email text,
-  contact2_phone text,
-  contact3_name  text,
-  contact3_email text,
-  contact3_phone text,
-  approved_date  date,
-  remarks        text,
-  company        text,
-  created_at     timestamptz default now()
+  id              uuid primary key default gen_random_uuid(),
+  name            text not null,
+  customer_code   text,
+  bill_to_address text,
+  ship_to_address text,
+  country         text,
+  state           text,
+  postal_code     text,
+  website         text,
+  contact1_name   text,
+  contact1_email  text,
+  contact1_phone  text,
+  contact2_name   text,
+  contact2_email  text,
+  contact2_phone  text,
+  contact3_name   text,
+  contact3_email  text,
+  contact3_phone  text,
+  is_approved     boolean default false,
+  approved_date   date,
+  remarks         text,
+  company         text,
+  created_at      timestamptz default now()
 );
+
+-- Migration: add new columns to customers_master if table already exists
+alter table customers_master add column if not exists customer_code   text;
+alter table customers_master add column if not exists bill_to_address text;
+alter table customers_master add column if not exists ship_to_address text;
+alter table customers_master add column if not exists is_approved     boolean default false;
 
 -- Vendor / Supplier Master
 create table if not exists vendors_master (
@@ -100,6 +108,7 @@ alter table vendors_master add column if not exists remarks        text;
 create table if not exists products_master (
   id                uuid primary key default gen_random_uuid(),
   name              text not null,
+  product_code      text,
   pack_size         text,
   ndc_ma_code       text,
   country_of_origin text,
@@ -109,6 +118,7 @@ create table if not exists products_master (
 );
 
 -- Migration: add new columns if products_master already exists
+alter table products_master add column if not exists product_code      text;
 alter table products_master add column if not exists pack_size         text;
 alter table products_master add column if not exists country_of_origin text;
 alter table products_master add column if not exists remarks           text;

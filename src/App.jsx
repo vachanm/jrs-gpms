@@ -613,9 +613,12 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
   const [showUserMenu, setShowUserMenu]       = useState(false)
   const [erpOpen, setErpOpen]                 = useState(activePage.startsWith('erp-'))
   const [showCompanyPicker, setShowCompanyPicker] = useState(false)
-  const userMenuRef   = useRef(null)
-  const companyRef    = useRef(null)
-  const sidebarRef    = useRef(null)
+  const [companyPickerPos, setCompanyPickerPos] = useState(null)
+  const userMenuRef       = useRef(null)
+  const companyRef        = useRef(null)
+  const companyBtnRef     = useRef(null)
+  const companyDropRef    = useRef(null)
+  const sidebarRef        = useRef(null)
 
   // Collapse sidebar when clicking outside it (on main content)
   useEffect(() => {
@@ -638,7 +641,12 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
 
   useEffect(() => {
     if (!showCompanyPicker) return
-    const fn = e => { if (companyRef.current && !companyRef.current.contains(e.target)) setShowCompanyPicker(false) }
+    const fn = e => {
+      if (
+        companyRef.current && !companyRef.current.contains(e.target) &&
+        companyDropRef.current && !companyDropRef.current.contains(e.target)
+      ) setShowCompanyPicker(false)
+    }
     document.addEventListener('mousedown', fn)
     return () => document.removeEventListener('mousedown', fn)
   }, [showCompanyPicker])
@@ -711,7 +719,12 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
         {/* Company switcher */}
         <div style={{ padding: collapsed ? '8px 6px' : '8px', position: 'relative' }} ref={companyRef}>
           <button
-            onClick={() => setShowCompanyPicker(v => !v)}
+            ref={companyBtnRef}
+            onClick={() => {
+              const rect = companyBtnRef.current?.getBoundingClientRect()
+              if (rect) setCompanyPickerPos({ top: rect.bottom + 4, left: rect.left })
+              setShowCompanyPicker(v => !v)
+            }}
             title={collapsed ? selectedCompany : undefined}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 8,
@@ -738,14 +751,15 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
             )}
           </button>
 
-          {showCompanyPicker && (
-            <div style={{
-              position: 'absolute',
-              top: '100%', left: collapsed ? 70 : 8,
-              zIndex: 9999,
+          {showCompanyPicker && companyPickerPos && createPortal(
+            <div ref={companyDropRef} style={{
+              position: 'fixed',
+              top: companyPickerPos.top,
+              left: companyPickerPos.left,
+              zIndex: 99999,
               background: '#0d1b35',
               border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 10, minWidth: 230, padding: 4,
+              borderRadius: 10, minWidth: 240, padding: 4,
               boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
             }}>
               {COMPANIES.map(c => (
@@ -768,7 +782,8 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
                   )}
                 </button>
               ))}
-            </div>
+            </div>,
+            document.body
           )}
         </div>
 

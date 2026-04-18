@@ -255,8 +255,8 @@ function SortIcon({ field, sortField, sortDir }) {
   const active = sortField === field
   return (
     <span className="ml-1 inline-flex flex-col gap-[1px]">
-      <svg className={`w-3 h-3 ${active && sortDir === 'asc' ? 'text-blue-600' : 'text-gray-300'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-8 8h16z" /></svg>
-      <svg className={`w-3 h-3 ${active && sortDir === 'desc' ? 'text-blue-600' : 'text-gray-300'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 20l8-8H4z" /></svg>
+      <svg className={`w-3 h-3 ${active && sortDir === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-8 8h16z" /></svg>
+      <svg className={`w-3 h-3 ${active && sortDir === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 20l8-8H4z" /></svg>
     </span>
   )
 }
@@ -331,7 +331,18 @@ function QuickAddModal({ type, company, onSave, onClose }) {
     if (!name.trim()) return
     setSaving(true)
     const row = { name: name.trim(), company }
-    if (type === 'product') { row.ndc_ma_code = ndcCode.trim(); row.manufacturer = mfr.trim() }
+    if (type === 'product') {
+      row.ndc_ma_code = ndcCode.trim(); row.manufacturer = mfr.trim()
+      const { data: existing } = await supabase.from('products_master').select('product_code').eq('company', company)
+      const nums = (existing || []).map(r => r.product_code).filter(c => c && /^PRD-\d+$/.test(c)).map(c => parseInt(c.replace('PRD-', ''), 10))
+      row.product_code = `PRD-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
+    }
+    if (type === 'customer') {
+      const { data: existing } = await supabase.from('customers_master').select('customer_code').eq('company', company)
+      const nums = (existing || []).map(r => r.customer_code).filter(c => c && /^CUS-\d+$/.test(c)).map(c => parseInt(c.replace('CUS-', ''), 10))
+      row.customer_code = `CUS-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
+      row.is_approved = false
+    }
     const { data } = await supabase.from(config.table).insert([row]).select().single()
     setSaving(false)
     onSave(data)

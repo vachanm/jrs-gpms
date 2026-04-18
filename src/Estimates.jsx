@@ -24,6 +24,26 @@ function formatCurrency(amount, currency) {
   return `${currency || 'USD'} ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function SortIcon({ field, sortField, sortDir }) {
+  const active = sortField === field
+  return (
+    <span className="ml-1 inline-flex flex-col gap-[1px] align-middle">
+      <svg className={`w-3 h-3 ${active && sortDir === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-8 8h16z" /></svg>
+      <svg className={`w-3 h-3 ${active && sortDir === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 20l8-8H4z" /></svg>
+    </span>
+  )
+}
+
+function applySortRows(rows, field, dir) {
+  return [...rows].sort((a, b) => {
+    const av = a[field] ?? ''
+    const bv = b[field] ?? ''
+    if (av < bv) return dir === 'asc' ? -1 : 1
+    if (av > bv) return dir === 'asc' ? 1 : -1
+    return 0
+  })
+}
+
 export default function Estimates({ company, currentUser }) {
   const [estimates, setEstimates] = useState([])
   const [loading, setLoading]     = useState(true)
@@ -33,7 +53,14 @@ export default function Estimates({ company, currentUser }) {
   const [deletingId, setDeletingId]     = useState(null)
   const [openStatusId, setOpenStatusId] = useState(null)
   const [statusDropPos, setStatusDropPos] = useState(null)
+  const [sortField, setSortField] = useState('created_at')
+  const [sortDir, setSortDir]     = useState('desc')
   const statusBtnRefs = useRef({})
+
+  function toggleSort(f) {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(f); setSortDir('desc') }
+  }
 
   async function fetchEstimates() {
     setLoading(true)
@@ -77,15 +104,18 @@ export default function Estimates({ company, currentUser }) {
     setDeletingId(null)
   }
 
-  const filtered = estimates.filter(e => {
-    const matchStatus = statusFilter === 'All' || e.status === statusFilter
-    const q = search.toLowerCase()
-    const matchSearch = !q ||
-      (e.estimate_number || '').toLowerCase().includes(q) ||
-      (e.customer_name  || '').toLowerCase().includes(q) ||
-      (e.sales_rep      || '').toLowerCase().includes(q)
-    return matchStatus && matchSearch
-  })
+  const filtered = applySortRows(
+    estimates.filter(e => {
+      const matchStatus = statusFilter === 'All' || e.status === statusFilter
+      const q = search.toLowerCase()
+      const matchSearch = !q ||
+        (e.estimate_number || '').toLowerCase().includes(q) ||
+        (e.customer_name  || '').toLowerCase().includes(q) ||
+        (e.sales_rep      || '').toLowerCase().includes(q)
+      return matchStatus && matchSearch
+    }),
+    sortField, sortDir
+  )
 
   const counts = {
     total:    estimates.length,
@@ -174,12 +204,30 @@ export default function Estimates({ company, currentUser }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estimate #</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Sales Rep</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                    onClick={() => toggleSort('estimate_number')}>
+                  Estimate # <SortIcon field="estimate_number" sortField={sortField} sortDir={sortDir} />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                    onClick={() => toggleSort('created_at')}>
+                  Date <SortIcon field="created_at" sortField={sortField} sortDir={sortDir} />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                    onClick={() => toggleSort('customer_name')}>
+                  Customer <SortIcon field="customer_name" sortField={sortField} sortDir={sortDir} />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                    onClick={() => toggleSort('sales_rep')}>
+                  Sales Rep <SortIcon field="sales_rep" sortField={sortField} sortDir={sortDir} />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                    onClick={() => toggleSort('total_amount')}>
+                  Total <SortIcon field="total_amount" sortField={sortField} sortDir={sortDir} />
+                </th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                    onClick={() => toggleSort('status')}>
+                  Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} />
+                </th>
                 <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>

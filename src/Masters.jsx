@@ -68,8 +68,8 @@ const MASTERS = {
       { key: 'name', label: 'Supplier Name', required: true, placeholder: 'e.g. Global Supplies Inc' },
     ],
     columns: [
-      { label: 'Supplier Name', key: 'name' },
-      { label: 'Added', key: 'created_at', format: 'date' },
+      { label: 'Supplier Name', key: 'name', sortable: 'name' },
+      { label: 'Added', key: 'created_at', format: 'date', sortable: 'created_at' },
     ],
   },
   products: {
@@ -83,10 +83,10 @@ const MASTERS = {
       { key: 'manufacturer', label: 'Manufacturer',  required: false, placeholder: 'e.g. Bayer AG' },
     ],
     columns: [
-      { label: 'Product Name',  key: 'name' },
+      { label: 'Product Name',  key: 'name',        sortable: 'name' },
       { label: 'NDC / MA Code', key: 'ndc_ma_code' },
       { label: 'Manufacturer',  key: 'manufacturer' },
-      { label: 'Added',         key: 'created_at', format: 'date' },
+      { label: 'Added',         key: 'created_at',  format: 'date', sortable: 'created_at' },
     ],
   },
   storage: {
@@ -99,9 +99,9 @@ const MASTERS = {
       { key: 'location', label: 'Location',     required: false, placeholder: 'e.g. Amsterdam, NL' },
     ],
     columns: [
-      { label: 'Storage Name', key: 'name' },
+      { label: 'Storage Name', key: 'name',       sortable: 'name' },
       { label: 'Location',     key: 'location' },
-      { label: 'Added',        key: 'created_at', format: 'date' },
+      { label: 'Added',        key: 'created_at', format: 'date', sortable: 'created_at' },
     ],
   },
 }
@@ -129,6 +129,26 @@ const TABS = [
 function formatDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function applySortRows(rows, field, dir) {
+  return [...rows].sort((a, b) => {
+    const av = a[field] ?? ''
+    const bv = b[field] ?? ''
+    if (av < bv) return dir === 'asc' ? -1 : 1
+    if (av > bv) return dir === 'asc' ? 1 : -1
+    return 0
+  })
+}
+
+function SortIcon({ field, sortField, sortDir }) {
+  const active = sortField === field
+  return (
+    <span className="ml-1 inline-flex flex-col gap-[1px] align-middle">
+      <svg className={`w-3 h-3 ${active && sortDir === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-8 8h16z" /></svg>
+      <svg className={`w-3 h-3 ${active && sortDir === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 20l8-8H4z" /></svg>
+    </span>
+  )
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -244,15 +264,126 @@ function RemarksCell({ text }) {
   )
 }
 
+// ── Code generators ───────────────────────────────────────────────────────────
+async function generateCustomerCode(company) {
+  const { data } = await supabase.from('customers_master').select('customer_code').eq('company', company)
+  const nums = (data || []).map(r => r.customer_code).filter(c => c && /^CUS-\d+$/.test(c)).map(c => parseInt(c.replace('CUS-', ''), 10))
+  return `CUS-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
+}
+
+async function generateProductCode(company) {
+  const { data } = await supabase.from('products_master').select('product_code').eq('company', company)
+  const nums = (data || []).map(r => r.product_code).filter(c => c && /^PRD-\d+$/.test(c)).map(c => parseInt(c.replace('PRD-', ''), 10))
+  return `PRD-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
+}
+
+// ── Approval Badge (inline dropdown) ─────────────────────────────────────────
+function ApprovalBadge({ entry, onToggle }) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [pos, setPos] = useState(null)
+  const ref = useRef(null)
+  const dropRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const fn = e => {
+      if (
+        ref.current && !ref.current.contains(e.target) &&
+        dropRef.current && !dropRef.current.contains(e.target)
+      ) setOpen(false)
+    }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [open])
+
+  function handleOpen() {
+    const rect = ref.current?.getBoundingClientRect()
+    if (rect) setPos({ top: rect.bottom + 4, left: rect.left })
+    setOpen(v => !v)
+  }
+
+  async function select(val) {
+    setOpen(false)
+    if (val === entry.is_approved) return
+    setLoading(true)
+    await onToggle(entry.id, val)
+    setLoading(false)
+  }
+
+  const approved = entry.is_approved
+
+  return (
+    <div ref={ref} style={{ display: 'inline-block' }}>
+      <button
+        onClick={handleOpen}
+        disabled={loading}
+        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border cursor-pointer select-none transition
+          ${approved ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' : 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100'}`}
+      >
+        {loading
+          ? <span className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
+          : <span className={`w-1.5 h-1.5 rounded-full ${approved ? 'bg-emerald-500' : 'bg-amber-500'}`} />}
+        {approved ? 'Approved' : 'Unapproved'}
+        <svg className="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && pos && createPortal(
+        <div
+          ref={dropRef}
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 99999,
+            background: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            minWidth: 140,
+            overflow: 'hidden',
+          }}
+        >
+          {[
+            { val: true,  label: 'Approved',   cls: 'text-emerald-700 bg-emerald-50', dot: 'bg-emerald-500' },
+            { val: false, label: 'Unapproved', cls: 'text-amber-700 bg-amber-50',   dot: 'bg-amber-500'   },
+          ].map(({ val, label, cls, dot }) => (
+            <button
+              key={String(val)}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => select(val)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-left transition hover:opacity-80 ${val === approved ? cls : 'hover:bg-gray-50 text-gray-700'}`}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${val === approved ? dot : 'bg-gray-300'}`} />
+              {label}
+              {val === approved && (
+                <svg className="w-3 h-3 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
+
 // ── Customer Section ──────────────────────────────────────────────────────────
 const EMPTY_CUSTOMER = {
   name: '',
-  address1: '', address2: '',
+  customer_code: '',
+  bill_to_address: '',
+  ship_to_address: '',
   country: '', state: '', postal_code: '',
   website: '',
   contact1_name: '', contact1_email: '', contact1_phone: '',
   contact2_name: '', contact2_email: '', contact2_phone: '',
   contact3_name: '', contact3_email: '', contact3_phone: '',
+  is_approved: false,
   approved_date: '',
   remarks: '',
 }
@@ -268,7 +399,15 @@ function CustomerSection({ company, showToast }) {
   const [saving, setSaving]           = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [search, setSearch]           = useState('')
+  const [approvalFilter, setApprovalFilter] = useState('all')
+  const [sortField, setSortField]     = useState('created_at')
+  const [sortDir, setSortDir]         = useState('desc')
   const firstInputRef                 = useRef(null)
+
+  function toggleSort(f) {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(f); setSortDir('desc') }
+  }
 
   useEffect(() => { fetchEntries() }, [company])
 
@@ -284,7 +423,7 @@ function CustomerSection({ company, showToast }) {
   async function fetchEntries() {
     setLoading(true)
     const { data } = await supabase
-      .from('customers_master').select('*').eq('company', company).order('name')
+      .from('customers_master').select('*').eq('company', company).order('created_at', { ascending: false })
     setEntries(data || [])
     setLoading(false)
   }
@@ -297,7 +436,9 @@ function CustomerSection({ company, showToast }) {
     setEditing(entry)
     const presets = STATES_BY_COUNTRY[entry.country] || []
     setFreeTextState(!!(entry.state && !presets.includes(entry.state)))
-    setForm(Object.fromEntries(Object.keys(EMPTY_CUSTOMER).map(k => [k, entry[k] || ''])))
+    const f = Object.fromEntries(Object.keys(EMPTY_CUSTOMER).map(k => [k, entry[k] ?? '']))
+    f.is_approved = !!entry.is_approved
+    setForm(f)
     setErrors({})
     setShowForm(true)
   }
@@ -329,6 +470,7 @@ function CustomerSection({ company, showToast }) {
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Customer updated')
     } else {
+      if (!payload.customer_code) payload.customer_code = await generateCustomerCode(company)
       const { error } = await supabase.from('customers_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Customer added')
@@ -341,17 +483,23 @@ function CustomerSection({ company, showToast }) {
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
-  const filtered = entries.filter(e => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      e.name?.toLowerCase().includes(q) ||
-      e.country?.toLowerCase().includes(q) ||
-      e.state?.toLowerCase().includes(q) ||
-      e.contact1_name?.toLowerCase().includes(q) ||
-      e.contact1_email?.toLowerCase().includes(q)
-    )
-  })
+  const filtered = applySortRows(
+    entries.filter(e => {
+      if (approvalFilter === 'approved' && !e.is_approved) return false
+      if (approvalFilter === 'unapproved' && e.is_approved) return false
+      if (!search) return true
+      const q = search.toLowerCase()
+      return (
+        e.name?.toLowerCase().includes(q) ||
+        e.customer_code?.toLowerCase().includes(q) ||
+        e.country?.toLowerCase().includes(q) ||
+        e.state?.toLowerCase().includes(q) ||
+        e.contact1_name?.toLowerCase().includes(q) ||
+        e.contact1_email?.toLowerCase().includes(q)
+      )
+    }),
+    sortField, sortDir
+  )
 
   const hasPresetStates = !!(STATES_BY_COUNTRY[form.country]?.length)
 
@@ -384,19 +532,29 @@ function CustomerSection({ company, showToast }) {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16.65 16.65A7.5 7.5 0 1116.65 2a7.5 7.5 0 010 14.65z" />
-        </svg>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search customers…"
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" />
-        {search && (
-          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        )}
+      {/* Approval filter + search */}
+      <div className="flex items-center gap-3">
+        <div className="flex rounded-xl border border-gray-200 bg-white overflow-hidden shrink-0">
+          {[['all','All'],['approved','Approved'],['unapproved','Unapproved']].map(([v,l]) => (
+            <button key={v} onClick={() => setApprovalFilter(v)}
+              className={`px-3.5 py-2 text-xs font-medium transition ${approvalFilter === v ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16.65 16.65A7.5 7.5 0 1116.65 2a7.5 7.5 0 010 14.65z" />
+          </svg>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search customers…"
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -419,18 +577,45 @@ function CustomerSection({ company, showToast }) {
             <p className="text-xs text-gray-400 font-medium">{filtered.length} of {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'}</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '1100px', width: '100%' }}>
+            <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '1200px', width: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  {/* Frozen column */}
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
-                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
-                    Customer Name
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 cursor-pointer select-none hover:text-gray-700"
+                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                      onClick={() => toggleSort('name')}>
+                    Customer Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
-                  {['Address 1','Address 2','Country','State','Postal Code','Website','Contact 1 Name','Contact 1 Email','Contact 1 Phone','Contact 2 Name','Contact 2 Email','Contact 2 Phone','Contact 3 Name','Contact 3 Email','Contact 3 Phone','Approved Date','Remarks'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50">{h}</th>
+                  {[
+                    { label: 'Code',           field: 'customer_code' },
+                    { label: 'Bill To Address',field: null },
+                    { label: 'Ship To Address',field: null },
+                    { label: 'Country',        field: 'country' },
+                    { label: 'State',          field: null },
+                    { label: 'Postal Code',    field: null },
+                    { label: 'Website',        field: null },
+                    { label: 'Contact 1 Name', field: null },
+                    { label: 'Contact 1 Email',field: null },
+                    { label: 'Contact 1 Phone',field: null },
+                    { label: 'Contact 2 Name', field: null },
+                    { label: 'Contact 2 Email',field: null },
+                    { label: 'Contact 2 Phone',field: null },
+                    { label: 'Contact 3 Name', field: null },
+                    { label: 'Contact 3 Email',field: null },
+                    { label: 'Contact 3 Phone',field: null },
+                    { label: 'Approved Date',  field: 'approved_date' },
+                    { label: 'Added',          field: 'created_at' },
+                    { label: 'Remarks',        field: null },
+                  ].map(({ label, field }) => (
+                    <th key={label}
+                      className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 ${field ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
+                      onClick={field ? () => toggleSort(field) : undefined}>
+                      {label}{field && <SortIcon field={field} sortField={sortField} sortDir={sortDir} />}
+                    </th>
                   ))}
-                  {/* Frozen Actions column */}
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
+                      style={{ position: 'sticky', right: 140, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.04)' }}>
+                    Status
+                  </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
                       style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                     Actions
@@ -440,7 +625,6 @@ function CustomerSection({ company, showToast }) {
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(entry => (
                   <tr key={entry.id} className="hover:bg-blue-50/30 transition group">
-                    {/* Frozen customer name cell */}
                     <td className="px-5 py-3.5 bg-white group-hover:bg-blue-50"
                         style={{ position: 'sticky', left: 0, zIndex: 1, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-3">
@@ -450,9 +634,13 @@ function CustomerSection({ company, showToast }) {
                         <span className="font-semibold text-gray-900 whitespace-nowrap">{entry.name || '—'}</span>
                       </div>
                     </td>
-                    {/* Scrollable columns */}
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.address1 || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.address2 || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                        {entry.customer_code || <span className="text-gray-300 font-sans font-normal">—</span>}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[180px]"><RemarksCell text={entry.bill_to_address} /></td>
+                    <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[180px]"><RemarksCell text={entry.ship_to_address} /></td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.country || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.state || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.postal_code || <span className="text-gray-300">—</span>}</td>
@@ -475,8 +663,16 @@ function CustomerSection({ company, showToast }) {
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact3_email || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact3_phone || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.approved_date)}</td>
+                    <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.created_at)}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[160px]">
                       <RemarksCell text={entry.remarks} />
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-blue-50"
+                        style={{ position: 'sticky', right: 140, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.04)' }}>
+                      <ApprovalBadge entry={entry} onToggle={async (id, val) => {
+                        await supabase.from('customers_master').update({ is_approved: val }).eq('id', id)
+                        fetchEntries()
+                      }} />
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-blue-50"
                         style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
@@ -518,26 +714,50 @@ function CustomerSection({ company, showToast }) {
 
             {/* Modal body */}
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-              {/* Customer Name */}
-              <Field label="Customer Name *" error={errors.name}>
-                <input
-                  ref={firstInputRef}
-                  className={inputCls(!!errors.name)}
-                  value={form.name}
-                  placeholder="e.g. Pharma Corp Ltd"
-                  onChange={e => setField('name', e.target.value)}
-                />
-              </Field>
-
-              {/* Address */}
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Address Line 1">
-                  <input className={inputCls(false)} value={form.address1} placeholder="Street address"
-                    onChange={e => setField('address1', e.target.value)} />
+              {/* Customer Name + Code */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <Field label="Customer Name *" error={errors.name}>
+                    <input
+                      ref={firstInputRef}
+                      className={inputCls(!!errors.name)}
+                      value={form.name}
+                      placeholder="e.g. Pharma Corp Ltd"
+                      onChange={e => setField('name', e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <Field label="Customer Code">
+                  <input className={`${inputCls(false)} bg-gray-50 text-gray-500 font-mono`}
+                    value={editing ? (form.customer_code || '—') : 'Auto-generated'}
+                    readOnly disabled />
                 </Field>
-                <Field label="Address Line 2">
-                  <input className={inputCls(false)} value={form.address2} placeholder="Suite, floor, etc."
-                    onChange={e => setField('address2', e.target.value)} />
+              </div>
+
+              {/* Approval status */}
+              <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Approval Status</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Mark customer as approved for order processing</p>
+                </div>
+                <button type="button"
+                  onClick={() => setField('is_approved', !form.is_approved)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_approved ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.is_approved ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+
+              {/* Addresses */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Bill To Address">
+                  <textarea className={`${inputCls(false)} resize-none`} rows={3} value={form.bill_to_address}
+                    placeholder="Full billing address"
+                    onChange={e => setField('bill_to_address', e.target.value)} />
+                </Field>
+                <Field label="Ship To Address">
+                  <textarea className={`${inputCls(false)} resize-none`} rows={3} value={form.ship_to_address}
+                    placeholder="Full shipping address"
+                    onChange={e => setField('ship_to_address', e.target.value)} />
                 </Field>
               </div>
 
@@ -658,7 +878,14 @@ function SupplierSection({ company, showToast }) {
   const [saving, setSaving]               = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [search, setSearch]               = useState('')
+  const [sortField, setSortField]         = useState('created_at')
+  const [sortDir, setSortDir]             = useState('desc')
   const firstInputRef                     = useRef(null)
+
+  function toggleSort(f) {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(f); setSortDir('desc') }
+  }
 
   useEffect(() => { fetchEntries() }, [company])
 
@@ -674,7 +901,7 @@ function SupplierSection({ company, showToast }) {
   async function fetchEntries() {
     setLoading(true)
     const { data } = await supabase
-      .from('vendors_master').select('*').eq('company', company).order('name')
+      .from('vendors_master').select('*').eq('company', company).order('created_at', { ascending: false })
     setEntries(data || [])
     setLoading(false)
   }
@@ -730,18 +957,21 @@ function SupplierSection({ company, showToast }) {
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
-  const filtered = entries.filter(e => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      e.name?.toLowerCase().includes(q) ||
-      e.country?.toLowerCase().includes(q) ||
-      e.state?.toLowerCase().includes(q) ||
-      e.contact1_name?.toLowerCase().includes(q) ||
-      e.contact1_email?.toLowerCase().includes(q) ||
-      e.license_number?.toLowerCase().includes(q)
-    )
-  })
+  const filtered = applySortRows(
+    entries.filter(e => {
+      if (!search) return true
+      const q = search.toLowerCase()
+      return (
+        e.name?.toLowerCase().includes(q) ||
+        e.country?.toLowerCase().includes(q) ||
+        e.state?.toLowerCase().includes(q) ||
+        e.contact1_name?.toLowerCase().includes(q) ||
+        e.contact1_email?.toLowerCase().includes(q) ||
+        e.license_number?.toLowerCase().includes(q)
+      )
+    }),
+    sortField, sortDir
+  )
 
   const hasPresetStates = !!(STATES_BY_COUNTRY[form.country]?.length)
 
@@ -812,12 +1042,38 @@ function SupplierSection({ company, showToast }) {
             <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '1200px', width: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
-                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
-                    Supplier Name
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 cursor-pointer select-none"
+                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                      onClick={() => toggleSort('name')}>
+                    Supplier Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
-                  {['Address 1','Address 2','Country','State','Postal Code','Website','Contact 1 Name','Contact 1 Email','Contact 1 Phone','Contact 2 Name','Contact 2 Email','Contact 2 Phone','Contact 3 Name','Contact 3 Email','Contact 3 Phone','Approved Date','Valid Through','License No.','Remarks'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50">{h}</th>
+                  {[
+                    { label: 'Address 1',      field: null },
+                    { label: 'Address 2',      field: null },
+                    { label: 'Country',        field: 'country' },
+                    { label: 'State',          field: null },
+                    { label: 'Postal Code',    field: null },
+                    { label: 'Website',        field: null },
+                    { label: 'Contact 1 Name', field: null },
+                    { label: 'Contact 1 Email',field: null },
+                    { label: 'Contact 1 Phone',field: null },
+                    { label: 'Contact 2 Name', field: null },
+                    { label: 'Contact 2 Email',field: null },
+                    { label: 'Contact 2 Phone',field: null },
+                    { label: 'Contact 3 Name', field: null },
+                    { label: 'Contact 3 Email',field: null },
+                    { label: 'Contact 3 Phone',field: null },
+                    { label: 'Approved Date',  field: 'approved_date' },
+                    { label: 'Valid Through',  field: 'valid_through' },
+                    { label: 'License No.',    field: null },
+                    { label: 'Remarks',        field: null },
+                    { label: 'Added',          field: 'created_at' },
+                  ].map(({ label, field }) => (
+                    <th key={label}
+                        className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50${field ? ' cursor-pointer select-none' : ''}`}
+                        onClick={field ? () => toggleSort(field) : undefined}>
+                      {label}{field && <SortIcon field={field} sortField={sortField} sortDir={sortDir} />}
+                    </th>
                   ))}
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
                       style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
@@ -866,6 +1122,7 @@ function SupplierSection({ company, showToast }) {
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[160px]">
                       <RemarksCell text={entry.remarks} />
                     </td>
+                    <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.created_at)}</td>
                     <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-purple-50/40"
                         style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
@@ -1036,6 +1293,7 @@ function SupplierSection({ company, showToast }) {
 // ── Product Section ───────────────────────────────────────────────────────────
 const EMPTY_PRODUCT = {
   name: '',
+  product_code: '',
   pack_size: '',
   ndc_ma_code: '',
   country_of_origin: '',
@@ -1052,7 +1310,14 @@ function ProductSection({ company, showToast }) {
   const [saving, setSaving]           = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [search, setSearch]           = useState('')
+  const [sortField, setSortField]     = useState('created_at')
+  const [sortDir, setSortDir]         = useState('desc')
   const firstInputRef                 = useRef(null)
+
+  function toggleSort(f) {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(f); setSortDir('desc') }
+  }
 
   useEffect(() => { fetchEntries() }, [company])
 
@@ -1068,7 +1333,7 @@ function ProductSection({ company, showToast }) {
   async function fetchEntries() {
     setLoading(true)
     const { data } = await supabase
-      .from('products_master').select('*').eq('company', company).order('name')
+      .from('products_master').select('*').eq('company', company).order('created_at', { ascending: false })
     setEntries(data || [])
     setLoading(false)
   }
@@ -1104,6 +1369,7 @@ function ProductSection({ company, showToast }) {
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Product updated')
     } else {
+      if (!payload.product_code) payload.product_code = await generateProductCode(company)
       const { error } = await supabase.from('products_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Product added')
@@ -1116,16 +1382,19 @@ function ProductSection({ company, showToast }) {
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
-  const filtered = entries.filter(e => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      e.name?.toLowerCase().includes(q) ||
-      e.pack_size?.toLowerCase().includes(q) ||
-      e.ndc_ma_code?.toLowerCase().includes(q) ||
-      e.country_of_origin?.toLowerCase().includes(q)
-    )
-  })
+  const filtered = applySortRows(
+    entries.filter(e => {
+      if (!search) return true
+      const q = search.toLowerCase()
+      return (
+        e.name?.toLowerCase().includes(q) ||
+        e.pack_size?.toLowerCase().includes(q) ||
+        e.ndc_ma_code?.toLowerCase().includes(q) ||
+        e.country_of_origin?.toLowerCase().includes(q)
+      )
+    }),
+    sortField, sortDir
+  )
 
   return (
     <div className="space-y-4">
@@ -1191,15 +1460,27 @@ function ProductSection({ company, showToast }) {
             <p className="text-xs text-gray-400 font-medium">{filtered.length} of {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'}</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '800px', width: '100%' }}>
+            <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '900px', width: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
-                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
-                    Product Name
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 cursor-pointer select-none"
+                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                      onClick={() => toggleSort('name')}>
+                    Product Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
-                  {['Pack Size', 'NDC / MA Code', 'Country of Origin', 'Remarks', 'Added'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50">{h}</th>
+                  {[
+                    { label: 'Code',              field: 'product_code' },
+                    { label: 'Pack Size',          field: null },
+                    { label: 'NDC / MA Code',      field: null },
+                    { label: 'Country of Origin',  field: 'country_of_origin' },
+                    { label: 'Remarks',            field: null },
+                    { label: 'Added',              field: 'created_at' },
+                  ].map(({ label, field }) => (
+                    <th key={label}
+                        className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50${field ? ' cursor-pointer select-none' : ''}`}
+                        onClick={field ? () => toggleSort(field) : undefined}>
+                      {label}{field && <SortIcon field={field} sortField={sortField} sortDir={sortDir} />}
+                    </th>
                   ))}
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
                       style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
@@ -1218,6 +1499,11 @@ function ProductSection({ company, showToast }) {
                         </div>
                         <span className="font-semibold text-gray-900 whitespace-nowrap">{entry.name || '—'}</span>
                       </div>
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span className="text-xs font-mono font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                        {entry.product_code || <span className="text-gray-300 font-sans font-normal">—</span>}
+                      </span>
                     </td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.pack_size || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.ndc_ma_code || <span className="text-gray-300">—</span>}</td>
@@ -1264,15 +1550,24 @@ function ProductSection({ company, showToast }) {
             </div>
 
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-              <Field label="Product Name *" error={errors.name}>
-                <input
-                  ref={firstInputRef}
-                  className={inputCls(!!errors.name)}
-                  value={form.name}
-                  placeholder="e.g. Paracetamol 500mg"
-                  onChange={e => setField('name', e.target.value)}
-                />
-              </Field>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <Field label="Product Name *" error={errors.name}>
+                    <input
+                      ref={firstInputRef}
+                      className={inputCls(!!errors.name)}
+                      value={form.name}
+                      placeholder="e.g. Paracetamol 500mg"
+                      onChange={e => setField('name', e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <Field label="Product Code">
+                  <input className={`${inputCls(false)} bg-gray-50 text-gray-500 font-mono`}
+                    value={editing ? (form.product_code || '—') : 'Auto-generated'}
+                    readOnly disabled />
+                </Field>
+              </div>
 
               <Field label="Pack Size">
                 <input className={inputCls(false)} value={form.pack_size} placeholder="e.g. 10×10 blister"
@@ -1326,7 +1621,14 @@ function MasterSection({ masterKey, company, showToast }) {
   const [saving, setSaving]       = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [search, setSearch]       = useState('')
+  const [sortField, setSortField] = useState('created_at')
+  const [sortDir, setSortDir]     = useState('desc')
   const firstInputRef             = useRef(null)
+
+  function toggleSort(f) {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(f); setSortDir('desc') }
+  }
 
   useEffect(() => { fetchEntries() }, [company, masterKey])
 
@@ -1341,7 +1643,7 @@ function MasterSection({ masterKey, company, showToast }) {
 
   async function fetchEntries() {
     setLoading(true)
-    const { data } = await supabase.from(cfg.table).select('*').eq('company', company).order('name')
+    const { data } = await supabase.from(cfg.table).select('*').eq('company', company).order('created_at', { ascending: false })
     setEntries(data || [])
     setLoading(false)
   }
@@ -1384,10 +1686,13 @@ function MasterSection({ masterKey, company, showToast }) {
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
-  const filtered = entries.filter(e => {
-    const q = search.toLowerCase()
-    return !q || cfg.fields.some(f => e[f.key]?.toLowerCase().includes(q))
-  })
+  const filtered = applySortRows(
+    entries.filter(e => {
+      const q = search.toLowerCase()
+      return !q || cfg.fields.some(f => e[f.key]?.toLowerCase().includes(q))
+    }),
+    sortField, sortDir
+  )
 
   return (
     <div className="space-y-4">
@@ -1452,7 +1757,11 @@ function MasterSection({ masterKey, company, showToast }) {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {cfg.columns.map(col => (
-                  <th key={col.key} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{col.label}</th>
+                  <th key={col.key}
+                      className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide${col.sortable ? ' cursor-pointer select-none' : ''}`}
+                      onClick={col.sortable ? () => toggleSort(col.sortable) : undefined}>
+                    {col.label}{col.sortable && <SortIcon field={col.sortable} sortField={sortField} sortDir={sortDir} />}
+                  </th>
                 ))}
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>

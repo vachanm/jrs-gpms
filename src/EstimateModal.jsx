@@ -133,7 +133,7 @@ export async function generateEstimatePDF(data) {
   const logoDataURL = await loadLogoDataURL()
 
   if (logoDataURL) {
-    doc.addImage(logoDataURL, 'PNG', lm, 10, 50, 17)
+    doc.addImage(logoDataURL, 'PNG', lm, 7, 70, 24)
   } else {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
