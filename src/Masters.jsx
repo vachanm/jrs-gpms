@@ -1547,10 +1547,10 @@ export default function Masters({ company }) {
   function showToast(msg, type) { setToast({ message: msg, type: type || 'success' }) }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div>
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
-      <div className="max-w-screen-xl mx-auto p-6 space-y-6">
+      <div className="p-6 space-y-6">
 
         {/* Header */}
         <div>

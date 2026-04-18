@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Inquiries from './Inquiries'
 import Masters from './Masters'
+import Estimates from './Estimates'
 import { supabase } from './supabase'
 
 const COMPANIES = [
@@ -455,7 +456,9 @@ function MyProfileModal({ currentUser, selectedCompany, onClose, onNameUpdate })
 function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword }) {
   const [showUserMenu, setShowUserMenu]   = useState(false)
   const [showProfile, setShowProfile]     = useState(false)
+  const [showErpMenu, setShowErpMenu]     = useState(false)
   const dropdownRef                       = useRef(null)
+  const erpDropdownRef                    = useRef(null)
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -468,11 +471,21 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showUserMenu])
 
+  // Close ERP menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (erpDropdownRef.current && !erpDropdownRef.current.contains(e.target)) {
+        setShowErpMenu(false)
+      }
+    }
+    if (showErpMenu) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showErpMenu])
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'inquiries', label: 'Inquiries' },
     { id: 'masters',   label: 'Masters'   },
-    { id: 'erp',       label: 'ERP'       },
     { id: 'wms',       label: 'WMS'       },
   ]
 
@@ -541,6 +554,73 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
                 {item.label}
               </button>
             ))}
+
+            {/* ── ERP Dropdown ── */}
+            <div className="relative" ref={erpDropdownRef}>
+              <button
+                onClick={() => setShowErpMenu(v => !v)}
+                style={activePage.startsWith('erp-') ? {
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'white',
+                  fontSize: '13px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                } : {
+                  background: 'transparent',
+                  border: '1px solid transparent',
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '13px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontWeight: 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (!activePage.startsWith('erp-')) {
+                    e.currentTarget.style.color = 'white'
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!activePage.startsWith('erp-')) {
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+              >
+                <span className="flex items-center gap-1">
+                  ERP
+                  <svg className={`w-3 h-3 transition-transform ${showErpMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </button>
+
+              {showErpMenu && (
+                <div className="absolute left-0 top-full mt-2 bg-white rounded-xl shadow-2xl w-48 py-1 z-50 border border-gray-100">
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">ERP</p>
+                  </div>
+                  <button
+                    onClick={() => { setActivePage('erp-estimates'); setShowErpMenu(false) }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition"
+                  >
+                    <svg className="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Estimates
+                  </button>
+                  <div className="px-4 py-2">
+                    <p className="text-xs text-gray-300 italic">More modules coming soon…</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── User area ── */}
@@ -630,11 +710,9 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
             <p className="text-sm text-gray-400 mt-1">{selectedCompany}</p>
           </div>
         )}
-        {activePage === 'inquiries' && <Inquiries company={selectedCompany} currentUser={currentUser} />}
-        {activePage === 'masters'   && <Masters   company={selectedCompany} />}
-        {activePage === 'erp' && (
-          <div className="p-8"><h1 className="text-2xl font-bold mb-2 text-gray-900">ERP</h1><p className="text-gray-500">Coming soon...</p></div>
-        )}
+        {activePage === 'inquiries'     && <Inquiries company={selectedCompany} currentUser={currentUser} />}
+        {activePage === 'masters'       && <Masters   company={selectedCompany} />}
+        {activePage === 'erp-estimates' && <Estimates company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'wms' && (
           <div className="p-8"><h1 className="text-2xl font-bold mb-2 text-gray-900">WMS</h1><p className="text-gray-500">Coming soon...</p></div>
         )}

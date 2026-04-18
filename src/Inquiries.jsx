@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from './supabase'
+import EstimateModal from './EstimateModal'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STATUSES   = ['Active', 'Inactive', 'Lead', 'Prospect']
@@ -183,6 +184,67 @@ function DeleteModal({ item, label, onConfirm, onCancel }) {
           <button onClick={onCancel} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
           <button onClick={onConfirm} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-medium transition">Delete</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Delete All Modal ──────────────────────────────────────────────────────────
+function DeleteAllModal({ currentUser, count, onConfirm, onCancel }) {
+  const [password, setPassword] = useState('')
+  const [error, setError]       = useState('')
+  const [verifying, setVerifying] = useState(false)
+
+  useEffect(() => {
+    const fn = e => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', fn); return () => window.removeEventListener('keydown', fn)
+  }, [onCancel])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setVerifying(true)
+    const { data } = await supabase.from('users').select('id').eq('id', currentUser.id).eq('password', password).single()
+    setVerifying(false)
+    if (!data) { setError('Incorrect password. Please try again.'); return }
+    onConfirm()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100]">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl mx-4">
+        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-bold text-center text-gray-900 mb-1">Delete All Inquiries</h3>
+        <p className="text-gray-500 text-sm text-center mb-1">
+          You are about to permanently delete <span className="font-semibold text-red-600">{count} inquiries</span>.
+        </p>
+        <p className="text-gray-400 text-xs text-center mb-5">This action cannot be undone. Enter your password to confirm.</p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            autoFocus
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+          />
+          {error && <p className="text-red-600 text-xs">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onCancel}
+              className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">
+              Cancel
+            </button>
+            <button type="submit" disabled={!password || verifying}
+              className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition">
+              {verifying ? 'Verifying…' : 'Delete All'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
@@ -948,12 +1010,14 @@ export default function Inquiries({ company, currentUser }) {
   const [sortField, setSortField]   = useState('created_at')
   const [sortDir, setSortDir]       = useState('desc')
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [showDeleteAll, setShowDeleteAll] = useState(false)
   const [toast, setToast]           = useState(null)
   const [copyToast, setCopyToast]   = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [dateStart, setDateStart]   = useState('')
   const [dateEnd, setDateEnd]       = useState('')
   const [showReport, setShowReport] = useState(false)
+  const [showEstimate, setShowEstimate] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [quickAdd, setQuickAdd]     = useState(null) // { type: 'customer'|'vendor'|'product' }
 
@@ -1067,6 +1131,14 @@ export default function Inquiries({ company, currentUser }) {
     await fetchAll()
   }
 
+  async function handleDeleteAll() {
+    setShowDeleteAll(false)
+    const { error } = await supabase.from('inquiries').delete().eq('company', company)
+    if (error) { showToast(error.message, 'error'); return }
+    showToast('All inquiries deleted')
+    await fetchAll()
+  }
+
   function toggleSort(field) {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
@@ -1163,7 +1235,7 @@ export default function Inquiries({ company, currentUser }) {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div>
       <Toast toast={toast} onDismiss={() => setToast(null)} />
       <CopyToast show={copyToast} />
 
@@ -1191,6 +1263,16 @@ export default function Inquiries({ company, currentUser }) {
               Copy Quote Table{activeCount > 0 ? ` (${activeCount})` : ''}
             </button>
             <button
+              onClick={() => setShowEstimate(true)}
+              disabled={activeCount === 0}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-1.5 rounded-xl transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Generate Estimate{activeCount > 0 ? ` (${activeCount})` : ''}
+            </button>
+            <button
               onClick={() => setSelectedIds(new Set())}
               className="text-white/50 hover:text-white text-sm px-2 py-1.5 rounded-xl hover:bg-white/10 transition"
             >
@@ -1202,6 +1284,15 @@ export default function Inquiries({ company, currentUser }) {
 
       {confirmDelete && (
         <DeleteModal item={confirmDelete} label="Inquiry" onConfirm={handleDelete} onCancel={() => setConfirmDelete(null)} />
+      )}
+
+      {showDeleteAll && (
+        <DeleteAllModal
+          currentUser={currentUser}
+          count={inquiries.length}
+          onConfirm={handleDeleteAll}
+          onCancel={() => setShowDeleteAll(false)}
+        />
       )}
 
       {importFile && (
@@ -1225,10 +1316,21 @@ export default function Inquiries({ company, currentUser }) {
         />
       )}
 
+      {showEstimate && (
+        <EstimateModal
+          open={showEstimate}
+          onClose={() => setShowEstimate(false)}
+          selectedInquiries={filtered.filter(r => selectedIds.has(r.id) && r.status === 'Active')}
+          currentUser={currentUser}
+          company={company}
+          masterCustomers={masterCustomers}
+        />
+      )}
+
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) setImportFile(f); e.target.value = '' }} />
 
-      <div className="max-w-screen-xl mx-auto space-y-6" style={{ padding: '24px 32px' }}>
+      <div className="space-y-6 p-6">
 
         {/* ── Header ── */}
         <div className="flex items-start justify-between">
@@ -1250,6 +1352,14 @@ export default function Inquiries({ company, currentUser }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Generate Report
+            </button>
+            <button onClick={() => setShowDeleteAll(true)}
+              className="flex items-center gap-2 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete All
             </button>
             <button onClick={openAdd}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
