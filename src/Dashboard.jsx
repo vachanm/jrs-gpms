@@ -219,7 +219,20 @@ function TasksCard({ currentUser }) {
 }
 
 // ── Module Summary Card ───────────────────────────────────────────────────────
-function ModuleCard({ title, icon, iconBg, stats, onNavigate, comingSoon, loading }) {
+function TrendBadge({ count }) {
+  if (count == null) return null
+  if (count === 0) return <span className="text-[10px] text-gray-400 font-medium">no change this week</span>
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
+      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+      </svg>
+      +{count} this week
+    </span>
+  )
+}
+
+function ModuleCard({ title, icon, iconBg, stats, onNavigate, comingSoon, loading, trend }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
@@ -227,7 +240,10 @@ function ModuleCard({ title, icon, iconBg, stats, onNavigate, comingSoon, loadin
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${iconBg}`}>
             {icon}
           </div>
-          <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+            {!comingSoon && !loading && <TrendBadge count={trend} />}
+          </div>
         </div>
         {comingSoon ? (
           <span className="text-[10px] font-semibold px-2 py-1 bg-gray-100 text-gray-400 rounded-full uppercase tracking-wide">
@@ -236,7 +252,7 @@ function ModuleCard({ title, icon, iconBg, stats, onNavigate, comingSoon, loadin
         ) : (
           onNavigate && (
             <button onClick={onNavigate}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition">
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition shrink-0">
               Open
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -273,24 +289,35 @@ function ModuleCard({ title, icon, iconBg, stats, onNavigate, comingSoon, loadin
   )
 }
 
+// ── Greeting helper ───────────────────────────────────────────────────────────
+function greeting(name) {
+  const h = new Date().getHours()
+  const salutation = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
+  return `${salutation}, ${name.split(' ')[0]}`
+}
+
 // ── Main Dashboard Page ───────────────────────────────────────────────────────
 export default function DashboardPage({ currentUser, company, setActivePage }) {
-  const [inquiryStats, setInquiryStats] = useState(null)
-  const [masterStats, setMasterStats]   = useState(null)
+  const [inquiryStats, setInquiryStats]   = useState(null)
+  const [masterStats, setMasterStats]     = useState(null)
   const [estimateStats, setEstimateStats] = useState(null)
   const [loadingInquiries, setLoadingInquiries] = useState(true)
   const [loadingMasters, setLoadingMasters]     = useState(true)
   const [loadingEstimates, setLoadingEstimates] = useState(true)
 
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+  const weekAgoISO = weekAgo.toISOString()
+
   useEffect(() => {
     setLoadingInquiries(true)
-    supabase.from('inquiries').select('status').eq('company', company).then(({ data }) => {
+    supabase.from('inquiries').select('status, created_at').eq('company', company).then(({ data }) => {
       if (!data) { setInquiryStats(null); setLoadingInquiries(false); return }
       setInquiryStats({
         total:     data.length,
         active:    data.filter(r => r.status === 'Active').length,
         leads:     data.filter(r => r.status === 'Lead').length,
         prospects: data.filter(r => r.status === 'Prospect').length,
+        thisWeek:  data.filter(r => r.created_at >= weekAgoISO).length,
       })
       setLoadingInquiries(false)
     })
@@ -299,16 +326,18 @@ export default function DashboardPage({ currentUser, company, setActivePage }) {
   useEffect(() => {
     setLoadingMasters(true)
     Promise.all([
-      supabase.from('customers_master').select('id', { count: 'exact', head: true }).eq('company', company),
-      supabase.from('vendors_master').select('id', { count: 'exact', head: true }).eq('company', company),
-      supabase.from('products_master').select('id', { count: 'exact', head: true }).eq('company', company),
-      supabase.from('storage_master').select('id', { count: 'exact', head: true }).eq('company', company),
+      supabase.from('customers_master').select('created_at').eq('company', company),
+      supabase.from('vendors_master').select('created_at').eq('company', company),
+      supabase.from('products_master').select('created_at').eq('company', company),
+      supabase.from('storage_master').select('created_at').eq('company', company),
     ]).then(([c, v, p, s]) => {
+      const week = r => (r.data || []).filter(x => x.created_at >= weekAgoISO).length
       setMasterStats({
-        customers: c.count ?? 0,
-        vendors:   v.count ?? 0,
-        products:  p.count ?? 0,
-        storage:   s.count ?? 0,
+        customers: (c.data || []).length,
+        vendors:   (v.data || []).length,
+        products:  (p.data || []).length,
+        storage:   (s.data || []).length,
+        thisWeek:  week(c) + week(v) + week(p) + week(s),
       })
       setLoadingMasters(false)
     })
@@ -316,26 +345,29 @@ export default function DashboardPage({ currentUser, company, setActivePage }) {
 
   useEffect(() => {
     setLoadingEstimates(true)
-    supabase.from('estimates').select('status').eq('company', company).then(({ data }) => {
+    supabase.from('estimates').select('status, created_at').eq('company', company).then(({ data }) => {
       if (!data) { setEstimateStats(null); setLoadingEstimates(false); return }
       setEstimateStats({
         total:    data.length,
         draft:    data.filter(e => e.status === 'Draft').length,
         sent:     data.filter(e => e.status === 'Sent').length,
         accepted: data.filter(e => e.status === 'Accepted').length,
+        thisWeek: data.filter(e => e.created_at >= weekAgoISO).length,
       })
       setLoadingEstimates(false)
     })
   }, [company])
 
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const now   = new Date()
+  const today = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const tz    = now.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop()
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-400 text-sm mt-0.5">{today} · {company}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{greeting(currentUser.name)} 👋</h1>
+        <p className="text-gray-400 text-sm mt-0.5">{today} · {tz} · {company}</p>
       </div>
 
       {/* Top row: Tasks + Quick overview */}
@@ -401,6 +433,7 @@ export default function DashboardPage({ currentUser, company, setActivePage }) {
             title="Inquiries"
             iconBg="bg-blue-50"
             loading={loadingInquiries}
+            trend={inquiryStats?.thisWeek}
             onNavigate={() => setActivePage('inquiries')}
             icon={
               <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -420,6 +453,7 @@ export default function DashboardPage({ currentUser, company, setActivePage }) {
             title="Masters"
             iconBg="bg-indigo-50"
             loading={loadingMasters}
+            trend={masterStats?.thisWeek}
             onNavigate={() => setActivePage('masters')}
             icon={
               <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -439,6 +473,7 @@ export default function DashboardPage({ currentUser, company, setActivePage }) {
             title="ERP · Estimates"
             iconBg="bg-teal-50"
             loading={loadingEstimates}
+            trend={estimateStats?.thisWeek}
             onNavigate={() => setActivePage('erp-estimates')}
             icon={
               <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

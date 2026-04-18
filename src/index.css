@@ -1,1 +1,133 @@
 @import "tailwindcss";
+
+/* ── Brand tokens ────────────────────────────────────────────────────────────
+   Derived from logo: medium blue + leafy green
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --brand-blue:  #2B7DE9;
+  --brand-green: #28A865;
+
+  /* Light theme */
+  --bg-base:    #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-subtle:  #f8fafc;
+  --bg-muted:   #f1f5f9;
+  --border-1:   #e2e8f0;
+  --border-2:   #f1f5f9;
+}
+
+/* ── Dark theme ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg-base:    #070e1b;
+  --bg-surface: #0d1b35;
+  --bg-subtle:  #0a1628;
+  --bg-muted:   #112040;
+  --border-1:   rgba(255,255,255,0.09);
+  --border-2:   rgba(255,255,255,0.05);
+}
+
+/* ── Dark: neutral backgrounds ───────────────────────────────────────────── */
+[data-theme="dark"] .bg-white        { background-color: var(--bg-surface) !important; }
+[data-theme="dark"] .bg-gray-50      { background-color: var(--bg-subtle)  !important; }
+[data-theme="dark"] .bg-gray-100     { background-color: var(--bg-muted)   !important; }
+[data-theme="dark"] .bg-gray-200     { background-color: rgba(255,255,255,0.10) !important; }
+
+/* ── Dark: coloured tint backgrounds (status badges, stat cards) ─────────── */
+[data-theme="dark"] .bg-blue-50      { background-color: rgba(43,125,233,0.12)   !important; }
+[data-theme="dark"] .bg-emerald-50   { background-color: rgba(40,168,101,0.12)   !important; }
+[data-theme="dark"] .bg-amber-50     { background-color: rgba(251,191,36,0.12)   !important; }
+[data-theme="dark"] .bg-purple-50    { background-color: rgba(168,85,247,0.12)   !important; }
+[data-theme="dark"] .bg-red-50       { background-color: rgba(239,68,68,0.12)    !important; }
+[data-theme="dark"] .bg-indigo-50    { background-color: rgba(99,102,241,0.12)   !important; }
+[data-theme="dark"] .bg-teal-50      { background-color: rgba(20,184,166,0.12)   !important; }
+[data-theme="dark"] .bg-violet-50    { background-color: rgba(139,92,246,0.12)   !important; }
+[data-theme="dark"] .bg-slate-50     { background-color: rgba(148,163,184,0.07)  !important; }
+[data-theme="dark"] .bg-orange-50    { background-color: rgba(249,115,22,0.12)   !important; }
+
+/* ── Dark: text ──────────────────────────────────────────────────────────── */
+[data-theme="dark"] .text-gray-900   { color: #f1f5f9                   !important; }
+[data-theme="dark"] .text-gray-800   { color: #e2e8f0                   !important; }
+[data-theme="dark"] .text-gray-700   { color: rgba(255,255,255,0.72)    !important; }
+[data-theme="dark"] .text-gray-600   { color: rgba(255,255,255,0.60)    !important; }
+[data-theme="dark"] .text-gray-500   { color: rgba(255,255,255,0.50)    !important; }
+[data-theme="dark"] .text-gray-400   { color: rgba(255,255,255,0.38)    !important; }
+[data-theme="dark"] .text-gray-300   { color: rgba(255,255,255,0.28)    !important; }
+
+/* ── Dark: borders ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .border-gray-100 { border-color: var(--border-2) !important; }
+[data-theme="dark"] .border-gray-200 { border-color: var(--border-1) !important; }
+[data-theme="dark"] .border-gray-300 { border-color: rgba(255,255,255,0.14) !important; }
+
+[data-theme="dark"] .border-emerald-200 { border-color: rgba(40,168,101,0.28)  !important; }
+[data-theme="dark"] .border-amber-200   { border-color: rgba(251,191,36,0.28)  !important; }
+[data-theme="dark"] .border-blue-100    { border-color: rgba(43,125,233,0.22)  !important; }
+[data-theme="dark"] .border-red-200     { border-color: rgba(239,68,68,0.28)   !important; }
+[data-theme="dark"] .border-indigo-100  { border-color: rgba(99,102,241,0.22)  !important; }
+
+/* ── Dark: shadows ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .shadow-sm   { box-shadow: 0 1px 4px rgba(0,0,0,0.45)  !important; }
+[data-theme="dark"] .shadow-xl   { box-shadow: 0 8px 32px rgba(0,0,0,0.55) !important; }
+[data-theme="dark"] .shadow-2xl  { box-shadow: 0 12px 48px rgba(0,0,0,0.6) !important; }
+
+/* ── Dark: form controls ─────────────────────────────────────────────────── */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bg-subtle) !important;
+  color: #f1f5f9 !important;
+  border-color: var(--border-1) !important;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: rgba(255,255,255,0.28) !important; }
+[data-theme="dark"] option { background-color: #0d1b35; color: #f1f5f9; }
+
+/* ── Dark: table ─────────────────────────────────────────────────────────── */
+[data-theme="dark"] thead th {
+  background-color: var(--bg-subtle) !important;
+  color: rgba(255,255,255,0.55) !important;
+  border-color: var(--border-1) !important;
+}
+[data-theme="dark"] tbody td {
+  color: #e2e8f0 !important;
+  border-color: var(--border-2) !important;
+}
+[data-theme="dark"] tbody tr:hover td { background-color: rgba(255,255,255,0.03) !important; }
+
+/* ── Dark: hover utilities ───────────────────────────────────────────────── */
+[data-theme="dark"] .hover\:bg-gray-50:hover  { background-color: var(--bg-muted)            !important; }
+[data-theme="dark"] .hover\:bg-gray-100:hover { background-color: rgba(255,255,255,0.07)      !important; }
+[data-theme="dark"] .hover\:bg-red-50:hover   { background-color: rgba(239,68,68,0.12)        !important; }
+
+/* ── Dark: hover:bg-* on <tr> rows ──────────────────────────────────────── */
+[data-theme="dark"] .hover\:bg-blue-50:hover,
+[data-theme="dark"] .hover\:bg-blue-50\/30:hover    { background-color: rgba(43,125,233,0.12)  !important; }
+[data-theme="dark"] .hover\:bg-purple-50:hover,
+[data-theme="dark"] .hover\:bg-purple-50\/30:hover  { background-color: rgba(168,85,247,0.12)  !important; }
+[data-theme="dark"] .hover\:bg-emerald-50:hover,
+[data-theme="dark"] .hover\:bg-emerald-50\/30:hover { background-color: rgba(40,168,101,0.12)  !important; }
+[data-theme="dark"] .hover\:bg-amber-50:hover,
+[data-theme="dark"] .hover\:bg-amber-50\/30:hover   { background-color: rgba(251,191,36,0.12)  !important; }
+
+/* ── Dark: group-hover on <td> cells — inside @media(hover:hover) ────────── */
+@media (hover: hover) {
+  [data-theme="dark"] .group-hover\:bg-blue-50:is(:where(.group):hover *),
+  [data-theme="dark"] .group-hover\:bg-blue-50\/40:is(:where(.group):hover *),
+  [data-theme="dark"] .group-hover\:bg-white:is(:where(.group):hover *)      { background-color: rgba(43,125,233,0.12)  !important; }
+
+  [data-theme="dark"] .group-hover\:bg-purple-50:is(:where(.group):hover *),
+  [data-theme="dark"] .group-hover\:bg-purple-50\/40:is(:where(.group):hover *) { background-color: rgba(168,85,247,0.12) !important; }
+
+  [data-theme="dark"] .group-hover\:bg-emerald-50:is(:where(.group):hover *),
+  [data-theme="dark"] .group-hover\:bg-emerald-50\/40:is(:where(.group):hover *) { background-color: rgba(40,168,101,0.12) !important; }
+
+  [data-theme="dark"] .group-hover\:bg-gray-50:is(:where(.group):hover *)    { background-color: rgba(255,255,255,0.04) !important; }
+}
+
+/* ── Dark: dividers ──────────────────────────────────────────────────────── */
+[data-theme="dark"] .divide-gray-100 > * + * { border-color: var(--border-2) !important; }
+
+/* ── Dark: scrollbar (subtle, matches dark bg) ───────────────────────────── */
+[data-theme="dark"] ::-webkit-scrollbar        { width: 6px; height: 6px; }
+[data-theme="dark"] ::-webkit-scrollbar-track  { background: transparent; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 3px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }

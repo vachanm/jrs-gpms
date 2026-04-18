@@ -55,9 +55,17 @@ function App() {
   // Restore session from localStorage on first load
   const savedUser    = (() => { try { return JSON.parse(localStorage.getItem('jrs_user'))    } catch { return null } })()
   const savedCompany = (() => { try { return JSON.parse(localStorage.getItem('jrs_company')) } catch { return null } })()
+  const savedTheme   = (() => { try { return localStorage.getItem('jrs_theme') || 'light' } catch { return 'light' } })()
 
   const [currentUser, setCurrentUser]         = useState(savedUser)
   const [selectedCompany, setSelectedCompany] = useState(savedCompany || '')
+  const [theme, setTheme]                     = useState(savedTheme)
+
+  function toggleTheme() {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    localStorage.setItem('jrs_theme', next)
+  }
 
   const isLoggedIn = !!(currentUser && selectedCompany)
 
@@ -93,6 +101,8 @@ function App() {
         }}
         onLogout={handleLogout}
         onChangePassword={() => setShowChangePassword(true)}
+        theme={theme}
+        toggleTheme={toggleTheme}
       />
       {showChangePassword && (
         <ChangePasswordModal
@@ -287,7 +297,7 @@ function SidebarNavBtn({ label, icon, comingSoon, active, collapsed, indent, onC
         borderRadius: 8,
         border: 'none',
         cursor: comingSoon ? 'default' : 'pointer',
-        background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+        background: active ? 'rgba(43,125,233,0.18)' : 'transparent',
         color: active ? 'white' : 'rgba(255,255,255,0.5)',
         fontSize: indent ? 12 : 13,
         fontWeight: active ? 500 : 400,
@@ -392,7 +402,7 @@ function MyProfileModal({ currentUser, selectedCompany, onClose, onNameUpdate })
   )
 }
 
-function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword }) {
+function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword, theme, toggleTheme }) {
   const [collapsed, setCollapsed]             = useState(false)
   const [showProfile, setShowProfile]         = useState(false)
   const [showUserMenu, setShowUserMenu]       = useState(false)
@@ -451,7 +461,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
   const erpActive = activePage.startsWith('erp-')
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
 
       {/* ── Sidebar ── */}
       <aside style={{
@@ -490,10 +500,10 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
               borderRadius: 8, cursor: 'pointer', transition: 'background 0.15s',
             }}
           >
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', flexShrink: 0 }} />
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#28A865', flexShrink: 0 }} />
             {!collapsed && (
               <>
-                <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
+                <span style={{ fontSize: 11, color: '#28A865', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
                   {companyShort}
                 </span>
                 <svg style={{ width: 11, height: 11, color: 'rgba(74,222,128,0.6)', flexShrink: 0, transition: 'transform 0.2s', transform: showCompanyPicker ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -502,7 +512,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
               </>
             )}
             {collapsed && (
-              <span style={{ fontSize: 9, color: '#4ade80', fontWeight: 700, letterSpacing: '0.04em' }}>{companyTag}</span>
+              <span style={{ fontSize: 9, color: '#28A865', fontWeight: 700, letterSpacing: '0.04em' }}>{companyTag}</span>
             )}
           </button>
 
@@ -530,7 +540,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
                 >
                   <span style={{ flex: 1 }}>{c}</span>
                   {c === selectedCompany && (
-                    <svg style={{ width: 12, height: 12, color: '#4ade80' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg style={{ width: 12, height: 12, color: '#28A865' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -565,7 +575,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
               width: '100%', padding: collapsed ? '9px 0' : '9px 10px',
               justifyContent: collapsed ? 'center' : 'flex-start',
               borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: erpActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+              background: erpActive ? 'rgba(43,125,233,0.18)' : 'transparent',
               color: erpActive ? 'white' : 'rgba(255,255,255,0.5)',
               fontSize: 13, fontWeight: erpActive ? 500 : 400,
               transition: 'background 0.15s, color 0.15s', marginBottom: 1,
@@ -686,6 +696,33 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
             )}
           </div>
 
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '100%', padding: '7px 0',
+              borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'transparent', color: 'rgba(255,255,255,0.25)',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.25)' }}
+          >
+            {theme === 'dark' ? (
+              /* Sun */
+              <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+              </svg>
+            ) : (
+              /* Moon */
+              <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
+
           {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(c => !c)}
@@ -708,15 +745,15 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
       </aside>
 
       {/* ── Main content ── */}
-      <main style={{ flex: 1, overflowY: 'auto', background: '#f1f5f9', display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, overflowY: 'auto', background: theme === 'dark' ? '#070e1b' : '#f1f5f9', display: 'flex', flexDirection: 'column' }}>
         {activePage === 'dashboard'     && <DashboardPage currentUser={currentUser} company={selectedCompany} setActivePage={setActivePage} />}
         {activePage === 'inquiries'     && <Inquiries company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'masters'       && <Masters company={selectedCompany} />}
         {activePage === 'erp-estimates' && <Estimates company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'wms' && (
           <div style={{ padding: 32 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginBottom: 8 }}>WMS</h1>
-            <p style={{ color: '#6b7280' }}>Coming soon…</p>
+            <h1 className="text-gray-900" style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>WMS</h1>
+            <p className="text-gray-500">Coming soon…</p>
           </div>
         )}
       </main>
