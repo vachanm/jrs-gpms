@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import Inquiries from './Inquiries'
 import Masters from './Masters'
 import Estimates from './Estimates'
+import DashboardPage from './Dashboard'
 import { supabase } from './supabase'
 
 const COMPANIES = [
@@ -270,107 +271,45 @@ function ChangePasswordModal({ currentUser, onClose }) {
   )
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-function CompanyBadge({ selectedCompany, onCompanyChange }) {
-  const [open, setOpen] = useState(false)
-  const [pos, setPos]   = useState({ top: 0, left: 0 })
-  const badgeRef        = useRef(null)
-
-  const tag = selectedCompany.includes('India') ? 'INDIA'
-    : selectedCompany.includes('BV') ? 'BV' : 'INC'
-
-  function handleOpen(e) {
-    e.stopPropagation()
-    if (open) { setOpen(false); return }
-    const rect = badgeRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 6, left: rect.left })
-    setOpen(true)
-  }
-
-  useEffect(() => {
-    if (!open) return
-    function close() { setOpen(false) }
-    document.addEventListener('mousedown', close)
-    document.addEventListener('scroll', close, true)
-    return () => {
-      document.removeEventListener('mousedown', close)
-      document.removeEventListener('scroll', close, true)
-    }
-  }, [open])
-
+// ── Sidebar nav button ────────────────────────────────────────────────────────
+function SidebarNavBtn({ label, icon, comingSoon, active, collapsed, indent, onClick }) {
   return (
-    <>
-      <button
-        ref={badgeRef}
-        onClick={handleOpen}
-        className="flex items-center gap-1 cursor-pointer"
-        style={{
-          background: 'rgba(74,222,128,0.2)',
-          color: '#4ade80',
-          border: '1px solid rgba(74,222,128,0.3)',
-          fontSize: '9px',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontWeight: 700,
-          letterSpacing: '0.05em',
-        }}
-      >
-        {tag}
-        <svg style={{ width: 8, height: 8, opacity: 0.7 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && createPortal(
-        <div
-          onMouseDown={e => e.stopPropagation()}
-          style={{
-            position: 'fixed',
-            top: pos.top,
-            left: pos.left,
-            zIndex: 99999,
-            background: 'rgba(15,31,61,0.97)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: '10px',
-            minWidth: '220px',
-            padding: '4px',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
-          }}
-        >
-          {COMPANIES.map(c => (
-            <button
-              key={c}
-              onClick={() => { onCompanyChange(c); setOpen(false) }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                width: '100%',
-                textAlign: 'left',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                color: 'white',
-                background: c === selectedCompany ? 'rgba(255,255,255,0.1)' : 'transparent',
-                cursor: 'pointer',
-                border: 'none',
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => { if (c !== selectedCompany) e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
-              onMouseLeave={e => { if (c !== selectedCompany) e.currentTarget.style.background = 'transparent' }}
-            >
-              <span style={{ flex: 1 }}>{c}</span>
-              {c === selectedCompany && (
-                <svg style={{ width: 12, height: 12, color: '#4ade80', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>,
-        document.body
+    <button
+      onClick={comingSoon ? undefined : onClick}
+      title={collapsed ? label : undefined}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        width: '100%',
+        padding: collapsed ? '9px 0' : indent ? '7px 10px 7px 30px' : '9px 10px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        borderRadius: 8,
+        border: 'none',
+        cursor: comingSoon ? 'default' : 'pointer',
+        background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+        color: active ? 'white' : 'rgba(255,255,255,0.5)',
+        fontSize: indent ? 12 : 13,
+        fontWeight: active ? 500 : 400,
+        transition: 'background 0.15s, color 0.15s',
+        marginBottom: 1,
+        textAlign: 'left',
+      }}
+      onMouseEnter={e => { if (!active && !comingSoon) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'white' } }}
+      onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = active ? 'white' : 'rgba(255,255,255,0.5)' } }}
+    >
+      <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
+      {!collapsed && (
+        <>
+          <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{label}</span>
+          {comingSoon && (
+            <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.35)', padding: '2px 5px', borderRadius: 4, fontWeight: 600, letterSpacing: '0.06em' }}>
+              SOON
+            </span>
+          )}
+        </>
       )}
-    </>
+    </button>
   )
 }
 
@@ -454,234 +393,291 @@ function MyProfileModal({ currentUser, selectedCompany, onClose, onNameUpdate })
 }
 
 function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword }) {
-  const [showUserMenu, setShowUserMenu]   = useState(false)
-  const [showProfile, setShowProfile]     = useState(false)
-  const [showErpMenu, setShowErpMenu]     = useState(false)
-  const dropdownRef                       = useRef(null)
-  const erpDropdownRef                    = useRef(null)
+  const [collapsed, setCollapsed]             = useState(false)
+  const [showProfile, setShowProfile]         = useState(false)
+  const [showUserMenu, setShowUserMenu]       = useState(false)
+  const [erpOpen, setErpOpen]                 = useState(activePage.startsWith('erp-'))
+  const [showCompanyPicker, setShowCompanyPicker] = useState(false)
+  const userMenuRef   = useRef(null)
+  const companyRef    = useRef(null)
 
-  // Close user menu when clicking outside
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowUserMenu(false)
-      }
-    }
-    if (showUserMenu) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    if (!showUserMenu) return
+    const fn = e => { if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setShowUserMenu(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
   }, [showUserMenu])
 
-  // Close ERP menu when clicking outside
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (erpDropdownRef.current && !erpDropdownRef.current.contains(e.target)) {
-        setShowErpMenu(false)
-      }
-    }
-    if (showErpMenu) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showErpMenu])
+    if (!showCompanyPicker) return
+    const fn = e => { if (companyRef.current && !companyRef.current.contains(e.target)) setShowCompanyPicker(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [showCompanyPicker])
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'inquiries', label: 'Inquiries' },
-    { id: 'masters',   label: 'Masters'   },
-    { id: 'wms',       label: 'WMS'       },
+  const companyShort = selectedCompany.includes('India') ? 'Jupiter R.S. India'
+    : selectedCompany.includes('BV') ? 'Jupiter R.S. BV' : 'Jupiter R.S. Inc'
+  const companyTag = selectedCompany.includes('India') ? 'INDIA'
+    : selectedCompany.includes('BV') ? 'BV' : 'INC'
+
+  const W = collapsed ? 64 : 220
+
+  const NAV_ITEMS = [
+    {
+      id: 'dashboard', label: 'Dashboard',
+      icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>,
+    },
+    {
+      id: 'inquiries', label: 'Inquiries',
+      icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+    },
+    {
+      id: 'masters', label: 'Masters',
+      icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>,
+    },
+    {
+      id: 'wms', label: 'WMS', comingSoon: true,
+      icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" /></svg>,
+    },
   ]
 
+  const ERP_SUB = [
+    {
+      id: 'erp-estimates', label: 'Estimates',
+      icon: <svg style={{ width: 15, height: 15 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+    },
+  ]
+
+  const erpActive = activePage.startsWith('erp-')
+
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1f3d 100%)' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
 
-      {/* ── Navbar wrapper ── */}
-      <div style={{ padding: '8px 16px' }}>
-        <div
-          className="flex items-center gap-2"
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '12px',
-            padding: '6px 16px',
-            height: '48px',
-          }}
-        >
-          {/* ── Logo area ── */}
-          <div className="flex items-center gap-2 mr-4 shrink-0">
-            <img src="/logoo-removebg-preview.png" alt="JRS" style={{ height: '26px', objectFit: 'contain' }} />
-            <span className="font-bold text-white text-sm">GPMS</span>
-            <CompanyBadge selectedCompany={selectedCompany} onCompanyChange={onCompanyChange} />
-          </div>
+      {/* ── Sidebar ── */}
+      <aside style={{
+        width: W, minWidth: W, maxWidth: W,
+        background: '#0a1628',
+        display: 'flex', flexDirection: 'column',
+        transition: 'width 0.22s ease, min-width 0.22s ease, max-width 0.22s ease',
+        borderRight: '1px solid rgba(255,255,255,0.07)',
+        overflow: 'hidden',
+        flexShrink: 0,
+      }}>
 
-          {/* ── Nav items ── */}
-          <div className="flex items-center gap-1">
-            {navItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActivePage(item.id)}
-                style={activePage === item.id ? {
-                  background: 'rgba(255,255,255,0.1)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  color: 'white',
-                  fontSize: '13px',
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                } : {
-                  background: 'transparent',
-                  border: '1px solid transparent',
-                  color: 'rgba(255,255,255,0.5)',
-                  fontSize: '13px',
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  fontWeight: 400,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  if (activePage !== item.id) {
-                    e.currentTarget.style.color = 'white'
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (activePage !== item.id) {
-                    e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
-                    e.currentTarget.style.background = 'transparent'
-                  }
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+        {/* Logo */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? '15px 0' : '15px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          minHeight: 58,
+        }}>
+          <img src="/logoo-removebg-preview.png" alt="JRS" style={{ height: 26, objectFit: 'contain', flexShrink: 0 }} />
+          {!collapsed && <span style={{ color: 'white', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap' }}>GPMS</span>}
+        </div>
 
-            {/* ── ERP Dropdown ── */}
-            <div className="relative" ref={erpDropdownRef}>
-              <button
-                onClick={() => setShowErpMenu(v => !v)}
-                style={activePage.startsWith('erp-') ? {
-                  background: 'rgba(255,255,255,0.1)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  color: 'white',
-                  fontSize: '13px',
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                } : {
-                  background: 'transparent',
-                  border: '1px solid transparent',
-                  color: 'rgba(255,255,255,0.5)',
-                  fontSize: '13px',
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  fontWeight: 400,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  if (!activePage.startsWith('erp-')) {
-                    e.currentTarget.style.color = 'white'
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!activePage.startsWith('erp-')) {
-                    e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
-                    e.currentTarget.style.background = 'transparent'
-                  }
-                }}
-              >
-                <span className="flex items-center gap-1">
-                  ERP
-                  <svg className={`w-3 h-3 transition-transform ${showErpMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+        {/* Company switcher */}
+        <div style={{ padding: collapsed ? '8px 6px' : '8px', position: 'relative' }} ref={companyRef}>
+          <button
+            onClick={() => setShowCompanyPicker(v => !v)}
+            title={collapsed ? selectedCompany : undefined}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+              padding: collapsed ? '7px 0' : '8px 10px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              background: showCompanyPicker ? 'rgba(74,222,128,0.15)' : 'rgba(74,222,128,0.08)',
+              border: '1px solid rgba(74,222,128,0.2)',
+              borderRadius: 8, cursor: 'pointer', transition: 'background 0.15s',
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', flexShrink: 0 }} />
+            {!collapsed && (
+              <>
+                <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
+                  {companyShort}
                 </span>
-              </button>
+                <svg style={{ width: 11, height: 11, color: 'rgba(74,222,128,0.6)', flexShrink: 0, transition: 'transform 0.2s', transform: showCompanyPicker ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+            {collapsed && (
+              <span style={{ fontSize: 9, color: '#4ade80', fontWeight: 700, letterSpacing: '0.04em' }}>{companyTag}</span>
+            )}
+          </button>
 
-              {showErpMenu && (
-                <div className="absolute left-0 top-full mt-2 bg-white rounded-xl shadow-2xl w-48 py-1 z-50 border border-gray-100">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">ERP</p>
-                  </div>
-                  <button
-                    onClick={() => { setActivePage('erp-estimates'); setShowErpMenu(false) }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition"
-                  >
-                    <svg className="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          {showCompanyPicker && (
+            <div style={{
+              position: 'absolute',
+              top: '100%', left: collapsed ? 70 : 8,
+              zIndex: 9999,
+              background: '#0d1b35',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 10, minWidth: 230, padding: 4,
+              boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+            }}>
+              {COMPANIES.map(c => (
+                <button key={c} onClick={() => { onCompanyChange(c); setShowCompanyPicker(false) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    width: '100%', padding: '8px 12px', borderRadius: 6,
+                    background: c === selectedCompany ? 'rgba(74,222,128,0.1)' : 'transparent',
+                    border: 'none', cursor: 'pointer', color: 'white', fontSize: 12, textAlign: 'left',
+                    transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={e => { if (c !== selectedCompany) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+                  onMouseLeave={e => { if (c !== selectedCompany) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <span style={{ flex: 1 }}>{c}</span>
+                  {c === selectedCompany && (
+                    <svg style={{ width: 12, height: 12, color: '#4ade80' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
-                    Estimates
-                  </button>
-                  <div className="px-4 py-2">
-                    <p className="text-xs text-gray-300 italic">More modules coming soon…</p>
-                  </div>
-                </div>
-              )}
+                  )}
+                </button>
+              ))}
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* ── User area ── */}
-          <div className="ml-auto relative shrink-0" ref={dropdownRef}>
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '4px 8px', overflowY: 'auto' }}>
+
+          {NAV_ITEMS.map(item => (
+            <SidebarNavBtn
+              key={item.id}
+              {...item}
+              active={activePage === item.id}
+              collapsed={collapsed}
+              onClick={() => setActivePage(item.id)}
+            />
+          ))}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 4px' }} />
+
+          {/* ERP parent */}
+          <button
+            onClick={() => collapsed ? setActivePage('erp-estimates') : setErpOpen(v => !v)}
+            title={collapsed ? 'ERP' : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: collapsed ? '9px 0' : '9px 10px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: erpActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+              color: erpActive ? 'white' : 'rgba(255,255,255,0.5)',
+              fontSize: 13, fontWeight: erpActive ? 500 : 400,
+              transition: 'background 0.15s, color 0.15s', marginBottom: 1,
+            }}
+            onMouseEnter={e => { if (!erpActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'white' } }}
+            onMouseLeave={e => { if (!erpActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' } }}
+          >
+            <svg style={{ width: 17, height: 17, flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            {!collapsed && (
+              <>
+                <span style={{ flex: 1 }}>ERP</span>
+                <svg style={{ width: 11, height: 11, transition: 'transform 0.2s', transform: erpOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+
+          {/* ERP sub-items */}
+          {!collapsed && erpOpen && ERP_SUB.map(item => (
+            <SidebarNavBtn
+              key={item.id}
+              {...item}
+              active={activePage === item.id}
+              collapsed={false}
+              indent
+              onClick={() => setActivePage(item.id)}
+            />
+          ))}
+        </nav>
+
+        {/* Bottom: user + collapse toggle */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '8px' }}>
+
+          {/* User menu */}
+          <div style={{ position: 'relative' }} ref={userMenuRef}>
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2.5"
+              onClick={() => setShowUserMenu(v => !v)}
+              title={collapsed ? currentUser?.name : undefined}
               style={{
-                background: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                padding: '5px 12px',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: collapsed ? '8px 0' : '8px 10px',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: showUserMenu ? 'rgba(255,255,255,0.1)' : 'transparent',
+                transition: 'background 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+              onMouseEnter={e => { if (!showUserMenu) e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+              onMouseLeave={e => { if (!showUserMenu) e.currentTarget.style.background = 'transparent' }}
             >
-              <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-                style={{ background: '#1d4ed8' }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'white', fontSize: 12, fontWeight: 700, flexShrink: 0,
+              }}>
                 {currentUser?.name?.charAt(0)}
               </div>
-              <div className="text-left">
-                <p className="leading-none font-medium" style={{ color: 'white', fontSize: '12px' }}>{currentUser?.name}</p>
-                <p className="leading-none mt-0.5" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>{currentUser?.role}</p>
-              </div>
-              <svg className="w-3 h-3 shrink-0" fill="none" stroke="rgba(255,255,255,0.4)" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              {!collapsed && (
+                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                  <p style={{ color: 'white', fontSize: 12, fontWeight: 500, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {currentUser?.name}
+                  </p>
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, margin: 0 }}>{currentUser?.role}</p>
+                </div>
+              )}
             </button>
 
             {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl w-52 py-1 z-50 border border-gray-100">
-                <div className="px-4 py-2.5 border-b border-gray-100">
-                  <p className="text-xs font-semibold text-gray-800">{currentUser?.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{selectedCompany}</p>
+              <div style={{
+                position: 'absolute', bottom: '100%',
+                left: collapsed ? 70 : 0,
+                marginBottom: 8,
+                background: 'white', borderRadius: 12,
+                boxShadow: '0 -8px 32px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.08)',
+                border: '1px solid #e5e7eb', width: 204, overflow: 'hidden', zIndex: 9999,
+              }}>
+                <div style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6' }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#111827', margin: 0 }}>{currentUser?.name}</p>
+                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>{companyShort}</p>
                 </div>
-                <button
-                  onClick={() => { setShowUserMenu(false); setShowProfile(true) }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
+                {[
+                  { label: 'My Profile', onClick: () => { setShowUserMenu(false); setShowProfile(true) },
+                    icon: <svg style={{ width: 14, height: 14, color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> },
+                  { label: 'Change Password', onClick: () => { setShowUserMenu(false); onChangePassword() },
+                    icon: <svg style={{ width: 14, height: 14, color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> },
+                ].map(({ label, onClick, icon }) => (
+                  <button key={label} onClick={onClick} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    width: '100%', padding: '9px 14px', background: 'transparent',
+                    border: 'none', cursor: 'pointer', fontSize: 13, color: '#374151', textAlign: 'left',
+                    transition: 'background 0.12s',
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {icon}{label}
+                  </button>
+                ))}
+                <div style={{ margin: '0 12px', borderTop: '1px solid #f3f4f6' }} />
+                <button onClick={onLogout} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  width: '100%', padding: '9px 14px', background: 'transparent',
+                  border: 'none', cursor: 'pointer', fontSize: 13, color: '#dc2626', textAlign: 'left',
+                  transition: 'background 0.12s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  My Profile
-                </button>
-                <button
-                  onClick={() => { setShowUserMenu(false); onChangePassword() }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
-                >
-                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Change Password
-                </button>
-                <div className="mx-3 border-t border-gray-100" />
-                <button
-                  onClick={onLogout}
-                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                   Sign Out
@@ -689,34 +685,46 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
               </div>
             )}
           </div>
+
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '100%', padding: '7px 0', marginTop: 4,
+              borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'transparent', color: 'rgba(255,255,255,0.25)',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.25)' }}
+          >
+            <svg style={{ width: 14, height: 14, transition: 'transform 0.22s', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
-      </div>
+      </aside>
 
-      {showProfile && (
-        <MyProfileModal
-          currentUser={currentUser}
-          selectedCompany={selectedCompany}
-          onClose={() => setShowProfile(false)}
-          onNameUpdate={setCurrentUser}
-        />
-      )}
-
-      {/* ── Page content ── */}
-      <div style={{ background: '#f1f5f9', borderRadius: '12px 12px 0 0', minHeight: 'calc(100vh - 64px)', marginTop: '0' }}>
-        {activePage === 'dashboard' && (
-          <div className="p-8">
-            <h1 className="text-2xl font-bold mb-1 text-gray-900">Dashboard</h1>
-            <p className="text-gray-500">Welcome back, {currentUser?.name}!</p>
-            <p className="text-sm text-gray-400 mt-1">{selectedCompany}</p>
-          </div>
-        )}
+      {/* ── Main content ── */}
+      <main style={{ flex: 1, overflowY: 'auto', background: '#f1f5f9', display: 'flex', flexDirection: 'column' }}>
+        {activePage === 'dashboard'     && <DashboardPage currentUser={currentUser} company={selectedCompany} setActivePage={setActivePage} />}
         {activePage === 'inquiries'     && <Inquiries company={selectedCompany} currentUser={currentUser} />}
-        {activePage === 'masters'       && <Masters   company={selectedCompany} />}
+        {activePage === 'masters'       && <Masters company={selectedCompany} />}
         {activePage === 'erp-estimates' && <Estimates company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'wms' && (
-          <div className="p-8"><h1 className="text-2xl font-bold mb-2 text-gray-900">WMS</h1><p className="text-gray-500">Coming soon...</p></div>
+          <div style={{ padding: 32 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginBottom: 8 }}>WMS</h1>
+            <p style={{ color: '#6b7280' }}>Coming soon…</p>
+          </div>
         )}
-      </div>
+      </main>
+
+      {showProfile && (
+        <MyProfileModal currentUser={currentUser} selectedCompany={selectedCompany}
+          onClose={() => setShowProfile(false)} onNameUpdate={setCurrentUser} />
+      )}
     </div>
   )
 }
