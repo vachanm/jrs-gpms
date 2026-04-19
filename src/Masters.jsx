@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import * as XLSX from 'xlsx'
 import { supabase } from './supabase'
 
 // ── Countries & States ────────────────────────────────────────────────────────
@@ -388,6 +389,309 @@ const EMPTY_CUSTOMER = {
   remarks: '',
 }
 
+// ── Master Import Config ──────────────────────────────────────────────────────
+const MASTER_IMPORT_CONFIG = {
+  customers_master: {
+    label: 'Customer', codeField: 'customer_code', codePrefix: 'CUS',
+    fields: [
+      { key: 'name',            label: 'Name',             required: true,  aliases: ['name', 'customer name', 'company name', 'customer'] },
+      { key: 'bill_to_address', label: 'Bill To Address',  required: false, aliases: ['bill to address', 'billing address', 'bill to', 'bill address'] },
+      { key: 'ship_to_address', label: 'Ship To Address',  required: false, aliases: ['ship to address', 'shipping address', 'ship to', 'ship address'] },
+      { key: 'country',         label: 'Country',          required: false, aliases: ['country'] },
+      { key: 'state',           label: 'State',            required: false, aliases: ['state', 'province'] },
+      { key: 'postal_code',     label: 'Postal Code',      required: false, aliases: ['postal code', 'zip', 'postcode', 'zip code'] },
+      { key: 'website',         label: 'Website',          required: false, aliases: ['website', 'web', 'url'] },
+      { key: 'contact1_name',   label: 'Contact 1 Name',   required: false, aliases: ['contact 1 name', 'contact name', 'primary contact'] },
+      { key: 'contact1_email',  label: 'Contact 1 Email',  required: false, aliases: ['contact 1 email', 'email', 'contact email', 'primary email'] },
+      { key: 'contact1_phone',  label: 'Contact 1 Phone',  required: false, aliases: ['contact 1 phone', 'phone', 'contact phone', 'primary phone'] },
+      { key: 'contact2_name',   label: 'Contact 2 Name',   required: false, aliases: ['contact 2 name', 'secondary contact'] },
+      { key: 'contact2_email',  label: 'Contact 2 Email',  required: false, aliases: ['contact 2 email', 'secondary email'] },
+      { key: 'contact2_phone',  label: 'Contact 2 Phone',  required: false, aliases: ['contact 2 phone', 'secondary phone'] },
+      { key: 'contact3_name',   label: 'Contact 3 Name',   required: false, aliases: ['contact 3 name'] },
+      { key: 'contact3_email',  label: 'Contact 3 Email',  required: false, aliases: ['contact 3 email'] },
+      { key: 'contact3_phone',  label: 'Contact 3 Phone',  required: false, aliases: ['contact 3 phone'] },
+      { key: 'approved_date',   label: 'Approved Date',    required: false, aliases: ['approved date', 'approval date'] },
+      { key: 'remarks',         label: 'Remarks',          required: false, aliases: ['remarks', 'notes', 'comments'] },
+    ],
+  },
+  vendors_master: {
+    label: 'Supplier', codeField: null,
+    fields: [
+      { key: 'name',           label: 'Name',             required: true,  aliases: ['name', 'supplier name', 'vendor name', 'vendor', 'supplier'] },
+      { key: 'address1',       label: 'Address 1',        required: false, aliases: ['address 1', 'address', 'addr 1', 'addr1'] },
+      { key: 'address2',       label: 'Address 2',        required: false, aliases: ['address 2', 'addr 2', 'addr2'] },
+      { key: 'country',        label: 'Country',          required: false, aliases: ['country'] },
+      { key: 'state',          label: 'State',            required: false, aliases: ['state', 'province'] },
+      { key: 'postal_code',    label: 'Postal Code',      required: false, aliases: ['postal code', 'zip', 'postcode'] },
+      { key: 'website',        label: 'Website',          required: false, aliases: ['website', 'web', 'url'] },
+      { key: 'contact1_name',  label: 'Contact 1 Name',   required: false, aliases: ['contact 1 name', 'contact name', 'primary contact'] },
+      { key: 'contact1_email', label: 'Contact 1 Email',  required: false, aliases: ['contact 1 email', 'email', 'contact email'] },
+      { key: 'contact1_phone', label: 'Contact 1 Phone',  required: false, aliases: ['contact 1 phone', 'phone', 'contact phone'] },
+      { key: 'contact2_name',  label: 'Contact 2 Name',   required: false, aliases: ['contact 2 name', 'secondary contact'] },
+      { key: 'contact2_email', label: 'Contact 2 Email',  required: false, aliases: ['contact 2 email', 'secondary email'] },
+      { key: 'contact2_phone', label: 'Contact 2 Phone',  required: false, aliases: ['contact 2 phone', 'secondary phone'] },
+      { key: 'contact3_name',  label: 'Contact 3 Name',   required: false, aliases: ['contact 3 name'] },
+      { key: 'contact3_email', label: 'Contact 3 Email',  required: false, aliases: ['contact 3 email'] },
+      { key: 'contact3_phone', label: 'Contact 3 Phone',  required: false, aliases: ['contact 3 phone'] },
+      { key: 'approved_date',  label: 'Approved Date',    required: false, aliases: ['approved date', 'approval date'] },
+      { key: 'valid_through',  label: 'Valid Through',    required: false, aliases: ['valid through', 'valid till', 'expiry', 'expiry date'] },
+      { key: 'license_number', label: 'License Number',   required: false, aliases: ['license number', 'license no', 'licence no', 'licence number'] },
+      { key: 'remarks',        label: 'Remarks',          required: false, aliases: ['remarks', 'notes'] },
+    ],
+  },
+  products_master: {
+    label: 'Product', codeField: 'product_code', codePrefix: 'PRD',
+    fields: [
+      { key: 'name',              label: 'Name',              required: true,  aliases: ['name', 'product name', 'item name', 'product', 'item'] },
+      { key: 'pack_size',         label: 'Pack Size',         required: false, aliases: ['pack size', 'pack', 'packaging', 'size'] },
+      { key: 'ndc_ma_code',       label: 'NDC / MA Code',     required: false, aliases: ['ndc ma code', 'ndc', 'ma code', 'ndc/ma', 'national code'] },
+      { key: 'country_of_origin', label: 'Country of Origin', required: false, aliases: ['country of origin', 'origin', 'country', 'source country'] },
+      { key: 'remarks',           label: 'Remarks',           required: false, aliases: ['remarks', 'notes'] },
+    ],
+  },
+  storage_master: {
+    label: 'Storage Location', codeField: null,
+    fields: [
+      { key: 'name',     label: 'Name',     required: true,  aliases: ['name', 'storage name', 'location name', 'storage'] },
+      { key: 'location', label: 'Location', required: false, aliases: ['location', 'address', 'site'] },
+    ],
+  },
+}
+
+// ── Master Import Modal ───────────────────────────────────────────────────────
+function MasterImportModal({ file, tableKey, company, onClose, onImported }) {
+  const cfg = MASTER_IMPORT_CONFIG[tableKey]
+  const [step, setStep]               = useState('parsing')
+  const [headers, setHeaders]         = useState([])
+  const [rawRows, setRawRows]         = useState([])
+  const [mapping, setMapping]         = useState({})
+  const [preview, setPreview]         = useState([])
+  const [importing, setImporting]     = useState(false)
+  const [parseError, setParseError]   = useState('')
+  const [importError, setImportError] = useState('')
+
+  useEffect(() => {
+    const fn = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', fn); return () => window.removeEventListener('keydown', fn)
+  }, [onClose])
+
+  useEffect(() => {
+    async function parse() {
+      try {
+        const buf  = await file.arrayBuffer()
+        const wb   = XLSX.read(buf, { type: 'array' })
+        const ws   = wb.Sheets[wb.SheetNames[0]]
+        const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+        if (json.length < 2) { setParseError('File appears to be empty.'); setStep('error'); return }
+        const rawHeaders = json[0].map(h => String(h).trim()).filter(Boolean)
+        const dataRows = json.slice(1)
+          .map(row => { const o = {}; rawHeaders.forEach((h, i) => { o[h] = String(row[i] ?? '').trim() }); return o })
+          .filter(r => Object.values(r).some(v => v !== ''))
+        if (!dataRows.length) { setParseError('No data rows found.'); setStep('error'); return }
+        const lh = rawHeaders.map(h => h.toLowerCase().trim())
+        const autoMap = {}
+        cfg.fields.forEach(f => {
+          for (const alias of f.aliases) {
+            const idx = lh.indexOf(alias)
+            if (idx !== -1) { autoMap[f.key] = rawHeaders[idx]; break }
+          }
+        })
+        setHeaders(rawHeaders); setRawRows(dataRows); setMapping(autoMap); setStep('map')
+      } catch { setParseError('Could not read file. Ensure it is a valid .xlsx or .csv.'); setStep('error') }
+    }
+    parse()
+  }, [file])
+
+  function toDateString(val) {
+    if (!val) return null
+    const n = Number(val)
+    if (!isNaN(n) && n > 1000) {
+      const d = new Date(Math.round((n - 25569) * 86400 * 1000))
+      return d.toISOString().split('T')[0]
+    }
+    const d = new Date(val)
+    return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0]
+  }
+
+  const DATE_FIELDS = ['approved_date', 'valid_through']
+
+  function buildPreview() {
+    return rawRows.map(row => {
+      const d = {}
+      cfg.fields.forEach(f => { d[f.key] = String(row[mapping[f.key]] || '').trim() })
+      const errors = []
+      if (!d.name) errors.push('Name is required')
+      return { ...d, _errors: errors, _ok: errors.length === 0 }
+    })
+  }
+
+  async function doImport() {
+    setImportError('')
+    let toInsert = preview
+      .filter(r => r._ok)
+      .map(({ _errors, _ok, ...rest }) => {
+        const row = { ...rest, company }
+        DATE_FIELDS.forEach(f => { if (f in row) row[f] = toDateString(row[f]) || null })
+        Object.keys(row).forEach(k => { if (row[k] === '') row[k] = null })
+        return row
+      })
+
+    if (cfg.codeField) {
+      const { data: existing } = await supabase.from(tableKey).select(cfg.codeField).eq('company', company)
+      const rx = new RegExp(`^${cfg.codePrefix}-\\d+$`)
+      const nums = (existing || []).map(r => r[cfg.codeField]).filter(c => c && rx.test(c)).map(c => parseInt(c.replace(`${cfg.codePrefix}-`, ''), 10))
+      let next = nums.length > 0 ? Math.max(...nums) + 1 : 1
+      toInsert = toInsert.map(row => ({ ...row, [cfg.codeField]: `${cfg.codePrefix}-${String(next++).padStart(3, '0')}` }))
+    }
+
+    setImporting(true)
+    const { error } = await supabase.from(tableKey).insert(toInsert)
+    setImporting(false)
+    if (error) { setImportError(error.message); return }
+    onImported(toInsert.length)
+  }
+
+  const okCount  = preview.filter(r => r._ok).length
+  const errCount = preview.filter(r => !r._ok).length
+  const extraCols = cfg.fields.filter(f => f.key !== 'name').slice(0, 2)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Import {cfg.label}s from Excel / CSV</h2>
+            <p className="text-gray-400 text-xs mt-0.5">
+              {step === 'map'     && `${rawRows.length} rows found — map your columns`}
+              {step === 'preview' && 'Review before importing'}
+            </p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-5">
+          {step === 'parsing' && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-gray-400 text-sm">Reading file…</p>
+            </div>
+          )}
+          {step === 'error' && (
+            <div className="text-center py-16">
+              <svg className="w-12 h-12 text-amber-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <p className="font-semibold text-gray-800 mb-1">Could not read file</p>
+              <p className="text-gray-400 text-sm">{parseError}</p>
+            </div>
+          )}
+          {step === 'map' && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-700">
+                <strong>{rawRows.length}</strong> rows detected. Map your file's columns to {cfg.label} fields. Fields marked auto-detected were matched automatically.
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {cfg.fields.map(f => (
+                  <div key={f.key}>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      {f.label}
+                      {f.required && <span className="text-red-500 ml-1">*</span>}
+                      {mapping[f.key]
+                        ? <span className="ml-2 text-emerald-600 font-normal normal-case inline-flex items-center gap-0.5">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                            auto-detected
+                          </span>
+                        : <span className="ml-2 text-amber-500 font-normal normal-case">— not detected</span>}
+                    </label>
+                    <select className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      value={mapping[f.key] || ''}
+                      onChange={e => setMapping({ ...mapping, [f.key]: e.target.value || undefined })}>
+                      <option value="">— skip —</option>
+                      {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {step === 'preview' && (
+            <div className="space-y-4">
+              <div className="flex gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{okCount} ready
+                </span>
+                {errCount > 0 && <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-full text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />{errCount} will be skipped
+                </span>}
+              </div>
+              <div className="border border-gray-100 rounded-xl overflow-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      {['Status', 'Name', ...extraCols.map(f => f.label), 'Issues'].map(h => (
+                        <th key={h} className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {preview.map((row, i) => (
+                      <tr key={i} className={!row._ok ? 'bg-red-50/60' : ''}>
+                        <td className="px-3 py-2.5">
+                          {!row._ok
+                            ? <span className="text-red-600 font-medium flex items-center gap-1"><svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>Skip</span>
+                            : <span className="text-emerald-600 font-medium flex items-center gap-1"><svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>OK</span>}
+                        </td>
+                        <td className="px-3 py-2.5 font-medium text-gray-800">{row.name || <span className="text-red-400 italic">missing</span>}</td>
+                        {extraCols.map(f => <td key={f.key} className="px-3 py-2.5 text-gray-500">{row[f.key] || '—'}</td>)}
+                        <td className="px-3 py-2.5">{row._errors.map((m, j) => <p key={j} className="text-red-500">{m}</p>)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 pb-5 pt-4 border-t border-gray-100 shrink-0 space-y-3">
+          {importError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-700">
+              <span className="font-semibold">Import failed: </span>{importError}
+            </div>
+          )}
+          <div className="flex gap-3">
+            {step === 'map' && (
+              <>
+                <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={() => { setPreview(buildPreview()); setStep('preview') }} disabled={!mapping.name}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition">
+                  {!mapping.name ? 'Map the Name column first' : `Preview ${rawRows.length} rows →`}
+                </button>
+              </>
+            )}
+            {step === 'preview' && (
+              <>
+                <button onClick={() => { setStep('map'); setImportError('') }} className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">← Back</button>
+                <button onClick={onClose} className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={doImport} disabled={importing || okCount === 0}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+                  {importing && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {importing ? 'Importing…' : okCount === 0 ? 'No valid rows' : `Import ${okCount} ${cfg.label}${okCount !== 1 ? 's' : ''}`}
+                </button>
+              </>
+            )}
+            {(step === 'parsing' || step === 'error') && (
+              <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Close</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CustomerSection({ company, showToast }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
@@ -402,7 +706,9 @@ function CustomerSection({ company, showToast }) {
   const [approvalFilter, setApprovalFilter] = useState('all')
   const [sortField, setSortField]     = useState('created_at')
   const [sortDir, setSortDir]         = useState('desc')
+  const [importFile, setImportFile]   = useState(null)
   const firstInputRef                 = useRef(null)
+  const importFileRef                 = useRef(null)
 
   function toggleSort(f) {
     if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -505,6 +811,11 @@ function CustomerSection({ company, showToast }) {
 
   return (
     <div className="space-y-4">
+      {importFile && (
+        <MasterImportModal file={importFile} tableKey="customers_master" company={company}
+          onClose={() => setImportFile(null)}
+          onImported={count => { setImportFile(null); showToast(`${count} customer${count !== 1 ? 's' : ''} imported`); fetchEntries() }} />
+      )}
       {confirmDelete && (
         <DeleteModal
           displayName={confirmDelete.name}
@@ -525,11 +836,20 @@ function CustomerSection({ company, showToast }) {
             <p className="text-gray-400 text-xs">{entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} for {company}</p>
           </div>
         </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Add Entry
-        </button>
+        <div className="flex items-center gap-2">
+          <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+            onChange={e => { if (e.target.files[0]) { setImportFile(e.target.files[0]); e.target.value = '' } }} />
+          <button onClick={() => importFileRef.current?.click()}
+            className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            Import
+          </button>
+          <button onClick={openAdd}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Entry
+          </button>
+        </div>
       </div>
 
       {/* Approval filter + search */}

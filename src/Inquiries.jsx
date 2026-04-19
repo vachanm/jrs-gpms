@@ -290,21 +290,17 @@ const inputCls = err =>
    ${err ? 'border-red-300 focus:ring-red-300' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'}`
 
 // ── Master Select (dropdown with + Add New) ───────────────────────────────────
-function MasterSelect({ value, onChange, options, placeholder, onAddNew, addLabel, err }) {
+function MasterSelect({ value, onChange, options, placeholder, err }) {
   return (
     <select
       className={inputCls(err)}
       value={value}
-      onChange={e => {
-        if (e.target.value === '__ADD_NEW__') { onChange(value); onAddNew() }
-        else onChange(e.target.value)
-      }}
+      onChange={e => onChange(e.target.value)}
     >
       <option value="">{placeholder}</option>
       {options.map(opt => (
         <option key={opt.id} value={opt.name}>{opt.name}</option>
       ))}
-      <option value="__ADD_NEW__">＋ {addLabel}</option>
     </select>
   )
 }
@@ -1678,8 +1674,7 @@ export default function Inquiries({ company, currentUser }) {
                 <Field label="Customer *" error={errors.customer}>
                   <MasterSelect value={form.customer} err={!!errors.customer}
                     onChange={v => { setForm(f => ({ ...f, customer: v })); setErrors(e => ({ ...e, customer: '' })) }}
-                    options={masterCustomers} placeholder="Select customer…"
-                    onAddNew={() => setQuickAdd({ type: 'customer' })} addLabel="Add New Customer" />
+                    options={masterCustomers} placeholder="Select customer…" />
                 </Field>
 
                 <Field label="Account Manager">
@@ -1716,8 +1711,7 @@ export default function Inquiries({ company, currentUser }) {
                   <Field label="Product">
                     <MasterSelect value={form.product} err={false}
                       onChange={handleProductChange}
-                      options={masterProducts} placeholder="Select product…"
-                      onAddNew={() => setQuickAdd({ type: 'product' })} addLabel="Add New Product" />
+                      options={masterProducts} placeholder="Select product…" />
                   </Field>
                 </div>
 
@@ -1781,8 +1775,7 @@ export default function Inquiries({ company, currentUser }) {
                   <Field label="Supplier">
                     <MasterSelect value={form.supplier} err={false}
                       onChange={v => setForm(f => ({ ...f, supplier: v }))}
-                      options={masterVendors} placeholder="Select supplier…"
-                      onAddNew={() => setQuickAdd({ type: 'vendor' })} addLabel="Add New Vendor" />
+                      options={masterVendors} placeholder="Select supplier…" />
                   </Field>
                 </div>
 

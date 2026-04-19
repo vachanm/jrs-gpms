@@ -129,10 +129,28 @@ function LoginPage({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError]         = useState('')
   const [loading, setLoading]     = useState(false)
+  const [showUserDrop, setShowUserDrop] = useState(false)
+  const userDropRef = useRef(null)
 
   useEffect(() => {
     supabase.from('users').select('id, name, role').order('name').then(({ data }) => setUsers(data || []))
   }, [])
+
+  useEffect(() => {
+    if (!showUserDrop) return
+    const fn = e => { if (userDropRef.current && !userDropRef.current.contains(e.target)) setShowUserDrop(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [showUserDrop])
+
+  useEffect(() => {
+    if (!showUserDrop) return
+    const fn = e => { if (e.key === 'Escape') setShowUserDrop(false) }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [showUserDrop])
+
+  const selectedUserObj = users.find(u => u.name === selectedUser)
 
   async function handleLogin() {
     if (!selectedCompany)  return setError('Please select a company.')
@@ -194,19 +212,89 @@ function LoginPage({ onLogin }) {
           </div>
 
           {/* User Account Selector */}
-          <div className="mb-4">
+          <div className="mb-4" style={{ position: 'relative' }} ref={userDropRef}>
             <label className="block text-blue-200 text-sm font-medium mb-1.5">User Account</label>
-            <select
-              value={selectedUser}
-              onChange={e => { setSelectedUser(e.target.value); setError('') }}
-              className="w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={{ ...fieldStyle, color: selectedUser ? 'white' : 'rgba(255,255,255,0.4)' }}
+            <button
+              type="button"
+              onClick={() => setShowUserDrop(v => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 8, padding: '10px 14px', borderRadius: 8,
+                background: showUserDrop ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.08)',
+                border: showUserDrop ? '1px solid rgba(43,125,233,0.6)' : '1px solid rgba(255,255,255,0.15)',
+                cursor: 'pointer', transition: 'all 0.15s',
+                boxShadow: showUserDrop ? '0 0 0 3px rgba(43,125,233,0.18)' : 'none',
+              }}
             >
-              <option value="" disabled style={{ background: '#0f1f3d' }}>Select your account...</option>
-              {users.map(u => (
-                <option key={u.id} value={u.name} style={{ background: '#0f1f3d', color: 'white' }}>{u.name}</option>
-              ))}
-            </select>
+              {selectedUserObj ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                    background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontSize: 11, fontWeight: 700,
+                  }}>
+                    {selectedUserObj.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <p style={{ color: 'white', fontSize: 13, fontWeight: 500, margin: 0 }}>{selectedUserObj.name}</p>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, margin: 0 }}>{selectedUserObj.role}</p>
+                  </div>
+                </div>
+              ) : (
+                <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 13 }}>Select your account…</span>
+              )}
+              <svg style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.4)', flexShrink: 0, transition: 'transform 0.2s', transform: showUserDrop ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showUserDrop && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 100,
+                background: '#0d1b35', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 10, padding: 4,
+                boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+                maxHeight: 240, overflowY: 'auto',
+              }}>
+                {users.map(u => {
+                  const active = selectedUser === u.name
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => { setSelectedUser(u.name); setShowUserDrop(false); setError('') }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        width: '100%', padding: '8px 10px', borderRadius: 7,
+                        background: active ? 'rgba(43,125,233,0.18)' : 'transparent',
+                        border: 'none', cursor: 'pointer', transition: 'background 0.12s',
+                      }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <div style={{
+                        width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                        background: active ? 'linear-gradient(135deg, #2B7DE9, #3b82f6)' : 'rgba(255,255,255,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontSize: 11, fontWeight: 700,
+                      }}>
+                        {u.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ textAlign: 'left', flex: 1 }}>
+                        <p style={{ color: active ? 'white' : 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: active ? 600 : 400, margin: 0 }}>{u.name}</p>
+                        <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: 10, margin: 0 }}>{u.role}</p>
+                      </div>
+                      {active && (
+                        <svg style={{ width: 13, height: 13, color: '#2B7DE9', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Password */}

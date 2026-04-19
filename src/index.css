@@ -121,6 +121,12 @@
   [data-theme="dark"] .group-hover\:bg-emerald-50\/40:is(:where(.group):hover *) { background-color: rgba(40,168,101,0.12) !important; }
 
   [data-theme="dark"] .group-hover\:bg-gray-50:is(:where(.group):hover *)    { background-color: rgba(255,255,255,0.04) !important; }
+
+  /* Frozen/sticky columns must stay fully opaque — semi-transparent hovers
+     let horizontally-scrolled content bleed through the stuck cell. */
+  [data-theme="dark"] td[style*="sticky"]:is(:where(.group):hover *) {
+    background-color: var(--bg-muted) !important;
+  }
 }
 
 /* ── Dark: dividers ──────────────────────────────────────────────────────── */

@@ -112,21 +112,14 @@ export async function generateEstimatePDF(data) {
 
   doc.setFont('helvetica')
 
-  function heading(x, y, text, size) {
+  function sectionLabel(x, y, text) {
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(size || 9.5)
+    doc.setFontSize(7)
     doc.setTextColor(...BLUE)
     doc.text(text, x, y)
     doc.setDrawColor(...BLUE)
-    doc.setLineWidth(0.4)
-    doc.line(x, y + 1.3, x + doc.getTextWidth(text), y + 1.3)
-  }
-
-  function bodyText(x, y, text, color, size) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(size || 8.5)
-    doc.setTextColor(...(color || DARK))
-    doc.text(text, x, y)
+    doc.setLineWidth(0.35)
+    doc.line(x, y + 1.2, x + doc.getTextWidth(text), y + 1.2)
   }
 
   // ── TOP HEADER ──────────────────────────────────────────────────────
@@ -141,88 +134,87 @@ export async function generateEstimatePDF(data) {
     doc.text('JUPITER RESEARCH SERVICES', lm, 21)
   }
 
+  // Company contact — right-aligned with consistent 3.8mm line spacing
   const rX = W - rm
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8.5)
-  doc.setTextColor(...DARK)
-  doc.text(coName, rX, 13, { align: 'right' })
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...GRAY)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
+  doc.text(coName, rX, 12, { align: 'right' })
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...GRAY)
   const addrWrapped = doc.splitTextToSize(coAddress || '', 90)
-  let coY = 18
-  addrWrapped.forEach(ln => { doc.text(ln, rX, coY, { align: 'right' }); coY += 4 })
-  if (coWebsite) doc.text(coWebsite, rX, coY, { align: 'right' })
+  let coY = 17
+  addrWrapped.forEach(ln => { doc.text(ln, rX, coY, { align: 'right' }); coY += 3.8 })
+  if (coWebsite) doc.text(coWebsite, rX, coY + 1, { align: 'right' })
 
-  doc.setDrawColor(...LGRAY)
-  doc.setLineWidth(0.4)
+  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.4)
   doc.line(lm, 35, W - rm, 35)
 
-  doc.setFont('helvetica', 'bolditalic')
-  doc.setFontSize(20)
-  doc.setTextColor(...BLUE)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...BLUE)
   doc.text('ESTIMATE', lm, 44)
 
-  // ── CUSTOMER & QUOTE DETAILS ─────────────────────────────────────
-  const secY = 55
+  // ── ADDRESS BOXES ────────────────────────────────────────────────
+  const secY   = 51
+  const ADDR_W = 88
+  const PX     = 4
+  const PY     = 4
 
-  let leftY = secY
-  heading(lm, leftY, 'CUSTOMER ADDRESS')
-  leftY += 7
-  if (billToName) {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
-    doc.text(billToName, lm, leftY); leftY += 5
+  function calcAddrBoxH(nameLine, lines) {
+    const count = [nameLine, ...lines].filter(Boolean).length
+    return PY + 7 + count * 4.8 + PY
   }
-  ;[billToAddr1, billToAddr2, billToCountry].filter(Boolean).forEach(ln => {
-    bodyText(lm, leftY, ln, GRAY, 8); leftY += 4.5
-  })
 
-  leftY += 9
-
-  heading(lm, leftY, 'SHIPPING ADDRESS')
-  leftY += 7
-  if (shipToName) {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
-    doc.text(shipToName, lm, leftY); leftY += 5
+  function drawAddrBox(x, y, label, nameLine, lines) {
+    const h = calcAddrBoxH(nameLine, lines)
+    doc.setFillColor(247, 248, 252)
+    doc.setDrawColor(210, 215, 228)
+    doc.setLineWidth(0.1)
+    doc.roundedRect(x, y, ADDR_W, h, 2, 2, 'FD')
+    sectionLabel(x + PX, y + PY + 3.5, label)
+    let cy = y + PY + 11
+    if (nameLine) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
+      doc.text(nameLine, x + PX, cy); cy += 4.8
+    }
+    lines.filter(Boolean).forEach(ln => {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY)
+      doc.text(ln, x + PX, cy); cy += 4.8
+    })
+    return y + h
   }
-  ;[shipToAddr1, shipToAddr2, shipToCountry].filter(Boolean).forEach(ln => {
-    bodyText(lm, leftY, ln, GRAY, 8); leftY += 4.5
-  })
 
-  const rcX = 110
-  let rightY = secY
-  heading(rcX, rightY, 'SALES QUOTE')
+  const b1Bottom   = drawAddrBox(lm, secY,          'CUSTOMER ADDRESS', billToName, [billToAddr1, billToAddr2, billToCountry])
+  const b2Bottom   = drawAddrBox(lm, b1Bottom + 4,  'SHIPPING ADDRESS', shipToName, [shipToAddr1, shipToAddr2, shipToCountry])
+  const leftBottom = b2Bottom
+
+  // ── SALES QUOTE — clean two-column grid, no pills ────────────────
+  const rcX    = lm + ADDR_W + 6
+  const QLBL_W = 28
+  const QVAL_W = W - rm - rcX - QLBL_W - 2
+  let rightY   = secY
+
+  sectionLabel(rcX, rightY, 'SALES QUOTE')
   rightY += 8
 
-  const PILL_W = 43, PILL_H = 5.5, PILL_GAP = 2.8, PILL_R = 1.3
-
-  const pillRows = [
-    ['ESTIMATE #',    estNum],
-    ['DATE',          formatDateDisplay(today)],
-    ['SALES REP',     salesRepName],
-    validTill          ? ['VALID TILL',     formatDateDisplay(validTill)] : null,
-    effectiveIncoterms ? ['INCOTERMS',       effectiveIncoterms]          : null,
-    effectivePayTerms  ? ['PAYMENT TERMS',   effectivePayTerms]           : null,
-    poNo               ? ['PO NO.',           poNo]                       : null,
-    note               ? ['NOTE',             note]                       : null,
+  const quoteRows = [
+    ['ESTIMATE #',   estNum],
+    ['DATE',         formatDateDisplay(today)],
+    ['SALES REP',    salesRepName],
+    validTill          ? ['VALID TILL',   formatDateDisplay(validTill)] : null,
+    effectiveIncoterms ? ['INCOTERMS',     effectiveIncoterms]          : null,
+    effectivePayTerms  ? ['PAYMENT TERMS', effectivePayTerms]           : null,
+    poNo               ? ['PO NO.',         poNo]                       : null,
+    note               ? ['NOTE',           note]                       : null,
   ].filter(Boolean)
 
-  pillRows.forEach(([label, value]) => {
-    doc.setFillColor(...BLUE)
-    doc.roundedRect(rcX, rightY, PILL_W, PILL_H, PILL_R, PILL_R, 'F')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(...WHITE)
-    doc.text(label, rcX + PILL_W / 2, rightY + PILL_H * 0.69, { align: 'center' })
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...DARK)
-    doc.text(String(value), rcX + PILL_W + 4, rightY + PILL_H * 0.72)
-    rightY += PILL_H + PILL_GAP
+  quoteRows.forEach(([label, value]) => {
+    doc.setFont('helvetica', 'bold');   doc.setFontSize(7.5); doc.setTextColor(...GRAY)
+    doc.text(label, rcX, rightY)
+    const valLines = doc.splitTextToSize(String(value), QVAL_W)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
+    doc.text(valLines, rcX + QLBL_W, rightY)
+    rightY += 6 * valLines.length
   })
 
   // ── LINE ITEMS TABLE ─────────────────────────────────────────────
-  const tY = Math.max(leftY, rightY) + 7
+  const tY = Math.max(leftBottom, rightY) + 7
 
   const cw      = [12, 84, 15, 13, 29, 29]
   const cLabels = ['LINE', 'CODE & DESCRIPTION', 'QTY', 'U/M', 'UNIT PRICE', 'TOTAL']
@@ -233,9 +225,7 @@ export async function generateEstimatePDF(data) {
     doc.rect(lm, y, uw, thH, 'F')
     let tx = lm
     cLabels.forEach((lbl, i) => {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7.5)
-      doc.setTextColor(...WHITE)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...WHITE)
       doc.text(lbl, tx + cw[i] / 2, y + 5.5, { align: 'center' })
       tx += cw[i]
     })
@@ -272,13 +262,11 @@ export async function generateEstimatePDF(data) {
     const itemH       = mainH + subTotalH
 
     if (ry + itemH > H - 68) {
-      doc.addPage()
-      ry = 16
-      drawTableHeader(ry)
-      ry += thH
+      doc.addPage(); ry = 16; drawTableHeader(ry); ry += thH
     }
 
-    doc.setFillColor(...(idx % 2 === 0 ? [255, 255, 255] : [250, 252, 255]))
+    // Zebra striping — white / light steel grey
+    doc.setFillColor(...(idx % 2 === 0 ? [255, 255, 255] : [243, 245, 249]))
     doc.rect(lm, ry, uw, mainH, 'F')
 
     const midY = ry + mainH / 2 + 1.5
@@ -288,19 +276,14 @@ export async function generateEstimatePDF(data) {
     const c5x  = c4x + cw[3]
     const c6x  = c5x + cw[4]
 
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...BLUE)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...BLUE)
     doc.text(String(idx + 1), lm + cw[0] / 2, midY, { align: 'center' })
 
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.setTextColor(...DARK)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
     let dy = ry + 4.5
     descLines.forEach(ln => { doc.text(ln, c2x + 2, dy); dy += 4.5 })
     if (item.item) {
-      doc.setFontSize(6.5)
-      doc.setTextColor(...GRAY)
+      doc.setFontSize(6.5); doc.setTextColor(...GRAY)
       doc.text(item.item, c2x + 2, dy)
     }
 
@@ -310,7 +293,6 @@ export async function generateEstimatePDF(data) {
 
     const upStr  = up  > 0 ? `${item.currency} ${up.toFixed(2)}`  : '—'
     doc.text(upStr,  c6x - 2,    midY, { align: 'right' })
-
     const totStr = tot > 0 ? `${item.currency} ${tot.toFixed(2)}` : '—'
     doc.text(totStr, W - rm - 2, midY, { align: 'right' })
 
@@ -334,36 +316,37 @@ export async function generateEstimatePDF(data) {
       ry += subTotalH
     }
 
-    doc.setDrawColor(...LGRAY)
-    doc.setLineWidth(0.2)
+    doc.setDrawColor(...LGRAY); doc.setLineWidth(0.2)
     doc.line(lm, ry, W - rm, ry)
   })
 
-  // ── TOTAL ROW ────────────────────────────────────────────────────
-  ry += 5
+  // ── TOTAL ROW — larger, dark blue ───────────────────────────────
+  ry += 6
   const c5xTotal = lm + cw[0] + cw[1] + cw[2] + cw[3] + cw[4]
-  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3)
-  doc.line(c5xTotal, ry - 3, W - rm, ry - 3)
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...BLUE)
-  doc.text('TOTAL',                             c5xTotal - 2, ry + 4, { align: 'right' })
-  doc.text(`${primaryCurrency} ${grandTotal.toFixed(2)}`, W - rm - 2, ry + 4, { align: 'right' })
-  ry += 12
+  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.4)
+  doc.line(c5xTotal, ry - 4, W - rm, ry - 4)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE)
+  doc.text('TOTAL',                                       c5xTotal - 2, ry + 5, { align: 'right' })
+  doc.text(`${primaryCurrency} ${grandTotal.toFixed(2)}`, W - rm - 2,  ry + 5, { align: 'right' })
+  ry += 14
 
   // ── FOOTER ───────────────────────────────────────────────────────
-  const ftY = ry
-  const nW  = 105
-  const bkX = lm + nW + 8
-  const bkW = uw - nW - 8
+  const ftY  = ry
+  const nW   = 100
+  const divX = lm + nW + 3
+  const bkX  = divX + 4
+  const bkW  = W - rm - bkX
 
-  heading(lm, ftY, 'NOTES')
-  let ny = ftY + 6
+  // Notes
+  sectionLabel(lm, ftY, 'NOTES')
+  let ny = ftY + 7
   FOOTER_NOTES.forEach(n => {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK)
     doc.splitTextToSize(n, nW - 2).forEach(ln => { doc.text(ln, lm, ny); ny += 3.6 })
     ny += 1
   })
 
-  heading(bkX, ftY, 'BANK DETAILS')
+  // Bank details — light grey sidebar box
   const bkRows = [
     ['Beneficiary',  bankBeneficiary],
     ['Bank',         bankName],
@@ -375,21 +358,34 @@ export async function generateEstimatePDF(data) {
     ['IBAN',         bankIban],
   ].filter(([, v]) => v)
 
-  let by = ftY + 6
+  const bkBoxH = 9 + bkRows.length * 4.4 + 4
+  doc.setFillColor(245, 246, 250)
+  doc.setDrawColor(210, 215, 228)
+  doc.setLineWidth(0.1)
+  doc.roundedRect(bkX, ftY - 2, bkW, bkBoxH, 2, 2, 'FD')
+
+  // Vertical divider between notes and bank sidebar
+  const divBottom = Math.max(ny, ftY - 2 + bkBoxH)
+  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3)
+  doc.line(divX, ftY - 2, divX, divBottom)
+
+  sectionLabel(bkX + 3, ftY + 4, 'BANK DETAILS')
+  let by = ftY + 12
   bkRows.forEach(([label, value]) => {
     doc.setFont('helvetica', 'bold');   doc.setFontSize(7.5); doc.setTextColor(...GRAY)
-    doc.text(`${label}:`, bkX, by)
+    doc.text(`${label}:`, bkX + 3, by)
     doc.setFont('helvetica', 'normal'); doc.setTextColor(...DARK)
-    doc.text(value, bkX + doc.getTextWidth(`${label}:`) + 1.5, by)
-    by += 4.2
+    doc.text(value, bkX + 3 + doc.getTextWidth(`${label}:`) + 1.5, by)
+    by += 4.4
   })
 
-  // ── TAGLINE ──────────────────────────────────────────────────────
-  const tgY = Math.max(ny, by) + 9
+  // ── TAGLINE — bullet separators, centred ─────────────────────────
+  const tgY = Math.max(ny, ftY - 2 + bkBoxH) + 12
   doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3)
-  doc.line(lm, tgY - 3, W - rm, tgY - 3)
+  doc.line(lm, tgY - 5, W - rm, tgY - 5)
+  const taglineText = TAGLINE.replace(/ \| /g, ' • ')
   doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(...GRAY)
-  doc.text(doc.splitTextToSize(TAGLINE, uw), W / 2, tgY, { align: 'center' })
+  doc.text(doc.splitTextToSize(taglineText, uw), W / 2, tgY, { align: 'center' })
 
   doc.save(`Estimate-${estNum}.pdf`)
 }
