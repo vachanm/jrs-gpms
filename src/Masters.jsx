@@ -109,6 +109,10 @@ const MASTERS = {
 
 const TABS = [
   {
+    key: 'company', label: 'Company Master',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+  },
+  {
     key: 'customers', label: 'Customer Master',
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
   },
@@ -2168,6 +2172,229 @@ function MasterSection({ masterKey, company, showToast }) {
   )
 }
 
+// ── Company Master ────────────────────────────────────────────────────────────
+const COMPANY_PROFILES = [
+  { key: 'Jupiter Research Services Inc',   short: 'JRS Inc',   country: 'United States' },
+  { key: 'Jupiter Research Services BV',    short: 'JRS BV',    country: 'Netherlands'   },
+  { key: 'Jupiter Research Services India', short: 'JRS India', country: 'India'         },
+]
+
+const EMPTY_CO = {
+  legal_name: '', address1: '', address2: '', city: '', state: '', country: '',
+  postal_code: '', phone: '', fax: '', email: '', website: '',
+  tax_id: '', vat_number: '',
+  bank_name: '', bank_address: '', bank_account_name: '',
+  bank_account_number: '', bank_routing_number: '', bank_swift: '',
+  bank_iban: '', bank_currency: '',
+}
+
+function CompanyMaster({ showToast }) {
+  const [activeKey, setActiveKey]   = useState(COMPANY_PROFILES[0].key)
+  const [profiles, setProfiles]     = useState({})
+  const [editing, setEditing]       = useState(false)
+  const [form, setForm]             = useState(EMPTY_CO)
+  const [saving, setSaving]         = useState(false)
+  const [loading, setLoading]       = useState(true)
+
+  useEffect(() => { fetchAll() }, [])
+
+  async function fetchAll() {
+    setLoading(true)
+    const { data } = await supabase.from('company_master').select('*')
+    const map = {}
+    ;(data || []).forEach(r => { map[r.company] = r })
+    setProfiles(map)
+    setLoading(false)
+  }
+
+  function startEdit() {
+    const ex = profiles[activeKey] || {}
+    setForm(Object.fromEntries(Object.keys(EMPTY_CO).map(k => [k, ex[k] ?? ''])))
+    setEditing(true)
+  }
+
+  function cancelEdit() { setEditing(false); setForm(EMPTY_CO) }
+
+  async function save() {
+    setSaving(true)
+    const payload = { ...form, company: activeKey, updated_at: new Date().toISOString() }
+    const ex = profiles[activeKey]
+    const { error } = ex?.id
+      ? await supabase.from('company_master').update(payload).eq('id', ex.id)
+      : await supabase.from('company_master').insert([payload])
+    if (error) { showToast(error.message, 'error'); setSaving(false); return }
+    showToast('Company profile saved')
+    setSaving(false); setEditing(false); fetchAll()
+  }
+
+  function sf(k, v) { setForm(p => ({ ...p, [k]: v })) }
+
+  const profile = profiles[activeKey] || {}
+  const hasData = !!profile.legal_name || !!profile.address1
+
+  function ViewRow({ label, value }) {
+    return (
+      <div className="flex gap-2">
+        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-36 shrink-0 pt-0.5">{label}</span>
+        <span className="text-sm text-gray-700">{value || <span className="text-gray-300 italic">—</span>}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Company sub-tabs */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-1.5 flex gap-1">
+        {COMPANY_PROFILES.map(cp => (
+          <button key={cp.key} onClick={() => { setActiveKey(cp.key); setEditing(false) }}
+            className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition
+              ${activeKey === cp.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+            {cp.short}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center text-gray-400 text-sm">Loading…</div>
+      ) : editing ? (
+        /* ── Edit Form ── */
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-900">{COMPANY_PROFILES.find(c => c.key === activeKey)?.short} — Edit Profile</h3>
+            <div className="flex gap-2">
+              <button onClick={cancelEdit} className="border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={save} disabled={saving}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2">
+                {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {saving ? 'Saving…' : 'Save Profile'}
+              </button>
+            </div>
+          </div>
+
+          {/* General */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General Information</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Legal Name"><input className={inputCls(false)} value={form.legal_name} onChange={e => sf('legal_name', e.target.value)} placeholder="Full legal name" /></Field>
+              <Field label="Tax ID / EIN"><input className={inputCls(false)} value={form.tax_id} onChange={e => sf('tax_id', e.target.value)} placeholder="e.g. 12-3456789" /></Field>
+              <Field label="VAT Number"><input className={inputCls(false)} value={form.vat_number} onChange={e => sf('vat_number', e.target.value)} placeholder="e.g. NL123456789B01" /></Field>
+              <Field label="Website"><input className={inputCls(false)} value={form.website} onChange={e => sf('website', e.target.value)} placeholder="e.g. www.jupiterrs.com" /></Field>
+            </div>
+          </div>
+
+          {/* Address */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Address</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Address Line 1"><input className={inputCls(false)} value={form.address1} onChange={e => sf('address1', e.target.value)} placeholder="Street address" /></Field>
+              <Field label="Address Line 2"><input className={inputCls(false)} value={form.address2} onChange={e => sf('address2', e.target.value)} placeholder="Suite, floor, etc." /></Field>
+              <Field label="City"><input className={inputCls(false)} value={form.city} onChange={e => sf('city', e.target.value)} placeholder="City" /></Field>
+              <Field label="State / Province"><input className={inputCls(false)} value={form.state} onChange={e => sf('state', e.target.value)} placeholder="State or province" /></Field>
+              <Field label="Country">
+                <select className={selectCls(false)} value={form.country} onChange={e => sf('country', e.target.value)}>
+                  <option value="">Select country…</option>
+                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+              <Field label="Postal Code"><input className={inputCls(false)} value={form.postal_code} onChange={e => sf('postal_code', e.target.value)} placeholder="Postal / ZIP code" /></Field>
+            </div>
+          </div>
+
+          {/* Contact */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Contact</p>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Phone"><input className={inputCls(false)} value={form.phone} onChange={e => sf('phone', e.target.value)} placeholder="+1 555 000 0000" /></Field>
+              <Field label="Fax"><input className={inputCls(false)} value={form.fax} onChange={e => sf('fax', e.target.value)} placeholder="+1 555 000 0001" /></Field>
+              <Field label="Email"><input className={inputCls(false)} value={form.email} onChange={e => sf('email', e.target.value)} placeholder="info@example.com" /></Field>
+            </div>
+          </div>
+
+          {/* Bank Details */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Bank Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Bank Name"><input className={inputCls(false)} value={form.bank_name} onChange={e => sf('bank_name', e.target.value)} placeholder="e.g. JPMorgan Chase" /></Field>
+              <Field label="Bank Address"><input className={inputCls(false)} value={form.bank_address} onChange={e => sf('bank_address', e.target.value)} placeholder="Bank branch address" /></Field>
+              <Field label="Account Name"><input className={inputCls(false)} value={form.bank_account_name} onChange={e => sf('bank_account_name', e.target.value)} placeholder="Account holder name" /></Field>
+              <Field label="Account Number"><input className={inputCls(false)} value={form.bank_account_number} onChange={e => sf('bank_account_number', e.target.value)} placeholder="Account number" /></Field>
+              <Field label="Routing / Sort Code"><input className={inputCls(false)} value={form.bank_routing_number} onChange={e => sf('bank_routing_number', e.target.value)} placeholder="e.g. 021000021" /></Field>
+              <Field label="SWIFT / BIC"><input className={inputCls(false)} value={form.bank_swift} onChange={e => sf('bank_swift', e.target.value)} placeholder="e.g. CHASUS33" /></Field>
+              <Field label="IBAN"><input className={inputCls(false)} value={form.bank_iban} onChange={e => sf('bank_iban', e.target.value)} placeholder="e.g. NL02ABNA0123456789" /></Field>
+              <Field label="Currency"><input className={inputCls(false)} value={form.bank_currency} onChange={e => sf('bank_currency', e.target.value)} placeholder="e.g. USD, EUR, INR" /></Field>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── View Mode ── */
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg">{COMPANY_PROFILES.find(c => c.key === activeKey)?.short}</h3>
+              <p className="text-xs text-gray-400 mt-0.5">{activeKey}</p>
+            </div>
+            <button onClick={startEdit}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition shadow-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              {hasData ? 'Edit Profile' : 'Add Profile'}
+            </button>
+          </div>
+
+          {!hasData ? (
+            <div className="text-center py-10 text-gray-400">
+              <svg className="w-10 h-10 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" /></svg>
+              <p className="text-sm">No profile yet — click <span className="font-semibold text-blue-600">Add Profile</span> to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">General Information</p>
+                <div className="space-y-2">
+                  <ViewRow label="Legal Name" value={profile.legal_name} />
+                  <ViewRow label="Tax ID / EIN" value={profile.tax_id} />
+                  <ViewRow label="VAT Number" value={profile.vat_number} />
+                  <ViewRow label="Website" value={profile.website} />
+                </div>
+              </div>
+              <div className="border-t border-gray-50 pt-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Address</p>
+                <div className="space-y-2">
+                  <ViewRow label="Address" value={[profile.address1, profile.address2].filter(Boolean).join(', ')} />
+                  <ViewRow label="City" value={profile.city} />
+                  <ViewRow label="State / Province" value={profile.state} />
+                  <ViewRow label="Country" value={profile.country} />
+                  <ViewRow label="Postal Code" value={profile.postal_code} />
+                </div>
+              </div>
+              <div className="border-t border-gray-50 pt-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Contact</p>
+                <div className="space-y-2">
+                  <ViewRow label="Phone" value={profile.phone} />
+                  <ViewRow label="Fax" value={profile.fax} />
+                  <ViewRow label="Email" value={profile.email} />
+                </div>
+              </div>
+              <div className="border-t border-gray-50 pt-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Bank Details</p>
+                <div className="space-y-2">
+                  <ViewRow label="Bank Name" value={profile.bank_name} />
+                  <ViewRow label="Bank Address" value={profile.bank_address} />
+                  <ViewRow label="Account Name" value={profile.bank_account_name} />
+                  <ViewRow label="Account Number" value={profile.bank_account_number} />
+                  <ViewRow label="Routing / Sort" value={profile.bank_routing_number} />
+                  <ViewRow label="SWIFT / BIC" value={profile.bank_swift} />
+                  <ViewRow label="IBAN" value={profile.bank_iban} />
+                  <ViewRow label="Currency" value={profile.bank_currency} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Masters Component ────────────────────────────────────────────────────
 export default function Masters({ company }) {
   const [activeTab, setActiveTab] = useState('customers')
@@ -2202,13 +2429,15 @@ export default function Masters({ company }) {
         </div>
 
         {/* Active Section */}
-        {activeTab === 'customers'
-          ? <CustomerSection key="customers" company={company} showToast={showToast} />
-          : activeTab === 'vendors'
-            ? <SupplierSection key="vendors" company={company} showToast={showToast} />
-            : activeTab === 'products'
-              ? <ProductSection key="products" company={company} showToast={showToast} />
-              : <MasterSection key={activeTab} masterKey={activeTab} company={company} showToast={showToast} />
+        {activeTab === 'company'
+          ? <CompanyMaster key="company" showToast={showToast} />
+          : activeTab === 'customers'
+            ? <CustomerSection key="customers" company={company} showToast={showToast} />
+            : activeTab === 'vendors'
+              ? <SupplierSection key="vendors" company={company} showToast={showToast} />
+              : activeTab === 'products'
+                ? <ProductSection key="products" company={company} showToast={showToast} />
+                : <MasterSection key={activeTab} masterKey={activeTab} company={company} showToast={showToast} />
         }
 
       </div>

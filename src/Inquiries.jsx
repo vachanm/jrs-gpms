@@ -1454,7 +1454,7 @@ export default function Inquiries({ company, currentUser }) {
               style={{ maxHeight: 'calc(100vh - 26rem)' }}
             >
               <table
-                className="text-xs"
+                className="text-sm"
                 style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '100%' }}
               >
                 <thead>

@@ -83,6 +83,17 @@ function App() {
     setSelectedCompany('')
   }
 
+  // Auto-logout after 10 minutes of inactivity
+  useEffect(() => {
+    if (!isLoggedIn) return
+    const TIMEOUT = 10 * 60 * 1000
+    let timer = setTimeout(handleLogout, TIMEOUT)
+    const reset = () => { clearTimeout(timer); timer = setTimeout(handleLogout, TIMEOUT) }
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click']
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }))
+    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, reset)) }
+  }, [isLoggedIn])
+
   if (!isLoggedIn) {
     return <LoginPage onLogin={handleLogin} />
   }
