@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { supabase } from './supabase'
 
 // ── Countries & States ────────────────────────────────────────────────────────
@@ -55,6 +57,85 @@ const STATES_BY_COUNTRY = {
     'Hamburg','Hesse','Lower Saxony','Mecklenburg-Vorpommern',
     'North Rhine-Westphalia','Rhineland-Palatinate','Saarland',
     'Saxony','Saxony-Anhalt','Schleswig-Holstein','Thuringia',
+  ],
+  'China': [
+    'Anhui','Beijing','Chongqing','Fujian','Gansu','Guangdong','Guangxi',
+    'Guizhou','Hainan','Hebei','Heilongjiang','Henan','Hubei','Hunan',
+    'Inner Mongolia','Jiangsu','Jiangxi','Jilin','Liaoning','Ningxia',
+    'Qinghai','Shaanxi','Shandong','Shanghai','Shanxi','Sichuan',
+    'Tianjin','Tibet','Xinjiang','Yunnan','Zhejiang',
+  ],
+  'France': [
+    'Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Brittany',
+    'Centre-Val de Loire','Corsica','Grand Est','Hauts-de-France',
+    'Île-de-France','Normandy','Nouvelle-Aquitaine','Occitanie',
+    'Pays de la Loire',"Provence-Alpes-Côte d'Azur",
+  ],
+  'Netherlands': [
+    'Drenthe','Flevoland','Friesland','Gelderland','Groningen','Limburg',
+    'North Brabant','North Holland','Overijssel','South Holland','Utrecht','Zeeland',
+  ],
+  'Belgium': ['Brussels','Flanders','Wallonia'],
+  'Spain': [
+    'Andalusia','Aragon','Asturias','Balearic Islands','Basque Country',
+    'Canary Islands','Cantabria','Castile and León','Castile-La Mancha',
+    'Catalonia','Extremadura','Galicia','La Rioja','Madrid','Murcia','Navarra','Valencia',
+  ],
+  'Italy': [
+    'Abruzzo','Aosta Valley','Apulia','Basilicata','Calabria','Campania',
+    'Emilia-Romagna','Friuli Venezia Giulia','Lazio','Liguria','Lombardy',
+    'Marche','Molise','Piedmont','Sardinia','Sicily','Trentino-South Tyrol',
+    'Tuscany','Umbria','Veneto',
+  ],
+  'Switzerland': [
+    'Aargau','Basel-Landschaft','Basel-Stadt','Bern','Fribourg','Geneva',
+    'Glarus','Graubünden','Jura','Lucerne','Neuchâtel','Nidwalden','Obwalden',
+    'Schaffhausen','Schwyz','Solothurn','St. Gallen','Thurgau','Ticino',
+    'Uri','Valais','Vaud','Zug','Zurich',
+  ],
+  'South Korea': [
+    'Busan','Daegu','Daejeon','Gangwon-do','Gwangju','Gyeonggi-do',
+    'Gyeongsangbuk-do','Gyeongsangnam-do','Incheon','Jeju','Jeollabuk-do',
+    'Jeollanam-do','Sejong','Seoul','Ulsan',
+  ],
+  'Japan': [
+    'Aichi','Akita','Aomori','Chiba','Ehime','Fukui','Fukuoka','Fukushima',
+    'Gifu','Gunma','Hiroshima','Hokkaido','Hyogo','Ibaraki','Ishikawa',
+    'Iwate','Kagawa','Kagoshima','Kanagawa','Kochi','Kumamoto','Kyoto',
+    'Mie','Miyagi','Miyazaki','Nagano','Nagasaki','Nara','Niigata','Oita',
+    'Okayama','Okinawa','Osaka','Saga','Saitama','Shiga','Shimane',
+    'Shizuoka','Tochigi','Tokushima','Tokyo','Tottori','Toyama','Wakayama',
+    'Yamagata','Yamaguchi','Yamanashi',
+  ],
+  'Malaysia': [
+    'Johor','Kedah','Kelantan','Kuala Lumpur','Labuan','Malacca',
+    'Negeri Sembilan','Pahang','Penang','Perak','Perlis','Putrajaya',
+    'Sabah','Sarawak','Selangor','Terengganu',
+  ],
+  'Indonesia': [
+    'Aceh','Bali','Bangka Belitung','Banten','Bengkulu','Central Java',
+    'Central Kalimantan','Central Sulawesi','East Java','East Kalimantan',
+    'East Nusa Tenggara','Gorontalo','Jakarta','Jambi','Lampung','Maluku',
+    'North Kalimantan','North Maluku','North Sulawesi','North Sumatra',
+    'Papua','Riau','Riau Islands','South Kalimantan','South Sulawesi',
+    'South Sumatra','Southeast Sulawesi','West Java','West Kalimantan',
+    'West Nusa Tenggara','West Papua','West Sulawesi','West Sumatra',
+    'Yogyakarta',
+  ],
+  'Brazil': [
+    'Acre','Alagoas','Amapá','Amazonas','Bahia','Ceará','Distrito Federal',
+    'Espírito Santo','Goiás','Maranhão','Mato Grosso','Mato Grosso do Sul',
+    'Minas Gerais','Pará','Paraíba','Paraná','Pernambuco','Piauí',
+    'Rio de Janeiro','Rio Grande do Norte','Rio Grande do Sul','Rondônia',
+    'Roraima','Santa Catarina','São Paulo','Sergipe','Tocantins',
+  ],
+  'Mexico': [
+    'Aguascalientes','Baja California','Baja California Sur','Campeche',
+    'Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango',
+    'Guanajuato','Guerrero','Hidalgo','Jalisco','México','Michoacán',
+    'Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro',
+    'Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco',
+    'Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas',
   ],
 }
 
@@ -133,7 +214,12 @@ const TABS = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  try {
+    const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''))
+    const day = String(d.getDate()).padStart(2, '0')
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+    return `${day}-${mon}-${d.getFullYear()}`
+  } catch { return iso }
 }
 
 function applySortRows(rows, field, dir) {
@@ -270,16 +356,89 @@ function RemarksCell({ text }) {
 }
 
 // ── Code generators ───────────────────────────────────────────────────────────
-async function generateCustomerCode(company) {
-  const { data } = await supabase.from('customers_master').select('customer_code').eq('company', company)
-  const nums = (data || []).map(r => r.customer_code).filter(c => c && /^CUS-\d+$/.test(c)).map(c => parseInt(c.replace('CUS-', ''), 10))
-  return `CUS-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
+// ── Country prefix maps ───────────────────────────────────────────────────────
+const CUSTOMER_PREFIX = {
+  'Canada': 'CCA', 'United States': 'CUS', 'China': 'CCN', 'India': 'CIN',
+  'Germany': 'CDE', 'Netherlands': 'CNL', 'South Korea': 'CSK',
+  'South Africa': 'CSA', 'Russia': 'CRS', 'Indonesia': 'CID',
+  'Malaysia': 'CML', 'Australia': 'CAU', 'New Zealand': 'CNZ',
+  'Brazil': 'CBR', 'Mexico': 'CMX', 'Japan': 'CJP', 'France': 'CFR',
+  'United Kingdom': 'CUK', 'Spain': 'CES', 'Italy': 'CIT',
+  'Belgium': 'CBE', 'Switzerland': 'CCH', 'Singapore': 'CSG',
+}
+const SUPPLIER_PREFIX = {
+  'Canada': 'SCA', 'United States': 'SUS', 'China': 'SCN', 'India': 'SIN',
+  'Germany': 'SDE', 'Netherlands': 'SNL', 'South Korea': 'SSK',
+  'South Africa': 'SSA', 'Russia': 'SRS', 'Indonesia': 'SID',
+  'Malaysia': 'SML', 'Australia': 'SAU', 'New Zealand': 'SNZ',
+  'Brazil': 'SBR', 'Mexico': 'SMX', 'Japan': 'SJP', 'France': 'SFR',
+  'United Kingdom': 'SUK', 'Spain': 'SES', 'Italy': 'SIT',
+  'Belgium': 'SBE', 'Switzerland': 'SCH', 'Singapore': 'SSG',
+}
+const COUNTRY_ISO2 = {
+  'United States': 'US', 'Canada': 'CA', 'Brazil': 'BR', 'India': 'IN',
+  'China': 'CN', 'Germany': 'DE', 'Netherlands': 'NL', 'South Korea': 'KR',
+  'South Africa': 'ZA', 'Russia': 'RU', 'Indonesia': 'ID', 'Malaysia': 'MY',
+  'Australia': 'AU', 'New Zealand': 'NZ', 'Mexico': 'MX', 'Japan': 'JP',
+  'United Kingdom': 'UK', 'France': 'FR', 'Spain': 'ES', 'Italy': 'IT',
+  'Belgium': 'BE', 'Switzerland': 'CH', 'Singapore': 'SG',
 }
 
-async function generateProductCode(company) {
-  const { data } = await supabase.from('products_master').select('product_code').eq('company', company)
-  const nums = (data || []).map(r => r.product_code).filter(c => c && /^PRD-\d+$/.test(c)).map(c => parseInt(c.replace('PRD-', ''), 10))
-  return `PRD-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
+// ── Material Types ────────────────────────────────────────────────────────────
+const MATERIAL_TYPES = [
+  { label: 'Product',                 code: 'PR' },
+  { label: 'Equipment',               code: 'EQ' },
+  { label: 'Ancillary',               code: 'AN' },
+  { label: 'Labels',                  code: 'LB' },
+  { label: 'Bulk',                    code: 'BK' },
+  { label: 'Services',                code: 'SR' },
+  { label: 'Package',                 code: 'PK' },
+  { label: 'Cartons',                 code: 'CT' },
+  { label: 'Logistics',               code: 'LG' },
+  { label: 'Asset',                   code: 'AS' },
+  { label: 'Warehouse',               code: 'WH' },
+  { label: 'Clinical Trial Material', code: 'TM' },
+]
+
+// ── Units of Measurement ──────────────────────────────────────────────────────
+const UNITS_OF_MEASUREMENT = [
+  { label: 'Each',             code: 'each' },
+  { label: 'Syringe',         code: 'Syr'  },
+  { label: 'Ampoules',        code: 'amps' },
+  { label: 'Vials',           code: 'vial' },
+  { label: 'Prefilled Syringe', code: 'PFS' },
+  { label: 'Prefilled PEN',   code: 'PFP'  },
+  { label: 'Cartridge',       code: 'Cart' },
+  { label: 'Packs',           code: 'pack' },
+]
+
+async function nextSeqNum(table, codeField, prefix, company) {
+  const { data } = await supabase.from(table).select(codeField).eq('company', company)
+  const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\d+)$`)
+  const nums = (data || []).map(r => r[codeField]).filter(Boolean)
+    .map(c => { const m = c.match(re); return m ? parseInt(m[1], 10) : null }).filter(n => n !== null)
+  return nums.length > 0 ? Math.max(...nums) + 1 : 10001
+}
+
+async function generateCustomerCode(country, company) {
+  const prefix = CUSTOMER_PREFIX[country] || 'CXX'
+  const seq = await nextSeqNum('customers_master', 'customer_code', prefix, company)
+  return `${prefix} ${seq}`
+}
+
+async function generateSupplierCode(country, company) {
+  const prefix = SUPPLIER_PREFIX[country] || 'SXX'
+  const seq = await nextSeqNum('vendors_master', 'supplier_code', prefix, company)
+  return `${prefix} ${seq}`
+}
+
+async function generateProductCode(country, materialType, company) {
+  const iso = COUNTRY_ISO2[country] || 'XX'
+  const mt = MATERIAL_TYPES.find(m => m.label === materialType)
+  const typeCode = mt ? mt.code : 'PR'
+  const prefix = `${iso}${typeCode}`
+  const seq = await nextSeqNum('products_master', 'product_code', prefix, company)
+  return `${prefix} ${seq}`
 }
 
 // ── Approval Badge (inline dropdown) ─────────────────────────────────────────
@@ -385,11 +544,15 @@ const EMPTY_CUSTOMER = {
   ship_to_address: '',
   country: '', state: '', postal_code: '',
   website: '',
+  valid_date: '',
   contact1_name: '', contact1_email: '', contact1_phone: '',
   contact2_name: '', contact2_email: '', contact2_phone: '',
   contact3_name: '', contact3_email: '', contact3_phone: '',
   is_approved: false,
   approved_date: '',
+  bank_name: '', bank_address: '', bank_account_name: '',
+  bank_account_number: '', bank_routing_number: '',
+  bank_swift: '', bank_iban: '', bank_currency: '',
   remarks: '',
 }
 
@@ -696,10 +859,31 @@ function MasterImportModal({ file, tableKey, company, onClose, onImported }) {
   )
 }
 
+const CUSTOMER_REPORT_COLS = [
+  { label: 'Code',           key: 'customer_code' },
+  { label: 'Name',           key: 'name' },
+  { label: 'Country',        key: 'country' },
+  { label: 'State',          key: 'state' },
+  { label: 'Postal Code',    key: 'postal_code' },
+  { label: 'Website',        key: 'website' },
+  { label: 'Valid Date',     key: 'valid_date',     format: 'date' },
+  { label: 'Approved',       key: 'is_approved' },
+  { label: 'Approved Date',  key: 'approved_date',  format: 'date' },
+  { label: 'Bank Name',      key: 'bank_name' },
+  { label: 'Account No.',    key: 'bank_account_number' },
+  { label: 'SWIFT',          key: 'bank_swift' },
+  { label: 'IBAN',           key: 'bank_iban' },
+  { label: 'Contact 1',      key: 'contact1_name' },
+  { label: 'Email 1',        key: 'contact1_email' },
+  { label: 'Phone 1',        key: 'contact1_phone' },
+  { label: 'Remarks',        key: 'remarks' },
+]
+
 function CustomerSection({ company, showToast }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
+  const [showReport, setShowReport]   = useState(false)
   const [editing, setEditing]         = useState(null)
   const [form, setForm]               = useState(EMPTY_CUSTOMER)
   const [freeTextState, setFreeTextState] = useState(false)
@@ -767,6 +951,7 @@ function CustomerSection({ company, showToast }) {
   function validate() {
     const e = {}
     if (!form.name?.trim()) e.name = 'Customer name is required'
+    if (form.is_approved && !form.approved_date) e.approved_date = 'Approved date is required'
     return e
   }
 
@@ -780,7 +965,7 @@ function CustomerSection({ company, showToast }) {
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Customer updated')
     } else {
-      if (!payload.customer_code) payload.customer_code = await generateCustomerCode(company)
+      if (!payload.customer_code) payload.customer_code = await generateCustomerCode(form.country, company)
       const { error } = await supabase.from('customers_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Customer added')
@@ -848,6 +1033,11 @@ function CustomerSection({ company, showToast }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             Import
           </button>
+          <button onClick={() => setShowReport(true)}
+            className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Report
+          </button>
           <button onClick={openAdd}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -855,6 +1045,8 @@ function CustomerSection({ company, showToast }) {
           </button>
         </div>
       </div>
+
+      {showReport && <MasterReportModal title="Customer Master" rows={filtered} columns={CUSTOMER_REPORT_COLS} company={company} onClose={() => setShowReport(false)} />}
 
       {/* Approval filter + search */}
       <div className="flex items-center gap-3">
@@ -1059,16 +1251,29 @@ function CustomerSection({ company, showToast }) {
               </div>
 
               {/* Approval status */}
-              <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Approval Status</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Mark customer as approved for order processing</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Approval Status</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Mark customer as approved for order processing</p>
+                  </div>
+                  <button type="button"
+                    onClick={() => {
+                      const next = !form.is_approved
+                      setField('is_approved', next)
+                      if (next && !form.approved_date) setField('approved_date', new Date().toISOString().split('T')[0])
+                      if (!next) setField('approved_date', '')
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_approved ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.is_approved ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
-                <button type="button"
-                  onClick={() => setField('is_approved', !form.is_approved)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_approved ? 'bg-emerald-500' : 'bg-gray-300'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.is_approved ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
+                {form.is_approved && (
+                  <Field label="Approved Date *" error={errors.approved_date}>
+                    <input type="date" className={inputCls(!!errors.approved_date)} value={form.approved_date}
+                      onChange={e => setField('approved_date', e.target.value)} />
+                  </Field>
+                )}
               </div>
 
               {/* Addresses */}
@@ -1120,11 +1325,17 @@ function CustomerSection({ company, showToast }) {
                 </Field>
               </div>
 
-              {/* Website */}
-              <Field label="Website">
-                <input className={inputCls(false)} value={form.website} placeholder="e.g. www.example.com"
-                  onChange={e => setField('website', e.target.value)} />
-              </Field>
+              {/* Website + Valid Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Website">
+                  <input className={inputCls(false)} value={form.website} placeholder="e.g. www.example.com"
+                    onChange={e => setField('website', e.target.value)} />
+                </Field>
+                <Field label="Valid Date">
+                  <input type="date" className={inputCls(false)} value={form.valid_date}
+                    onChange={e => setField('valid_date', e.target.value)} />
+                </Field>
+              </div>
 
               {/* Contact blocks */}
               {[1, 2, 3].map(n => (
@@ -1147,11 +1358,20 @@ function CustomerSection({ company, showToast }) {
                 </div>
               ))}
 
-              {/* Approved Date */}
-              <Field label="Approved Date">
-                <input type="date" className={inputCls(false)} value={form.approved_date}
-                  onChange={e => setField('approved_date', e.target.value)} />
-              </Field>
+              {/* Bank Details */}
+              <div className="border border-gray-100 rounded-xl p-4 space-y-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Bank Details</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Bank Name"><input className={inputCls(false)} value={form.bank_name} placeholder="e.g. HSBC" onChange={e => setField('bank_name', e.target.value)} /></Field>
+                  <Field label="Bank Address"><input className={inputCls(false)} value={form.bank_address} placeholder="Bank branch address" onChange={e => setField('bank_address', e.target.value)} /></Field>
+                  <Field label="Account Name"><input className={inputCls(false)} value={form.bank_account_name} placeholder="Account holder name" onChange={e => setField('bank_account_name', e.target.value)} /></Field>
+                  <Field label="Account Number"><input className={inputCls(false)} value={form.bank_account_number} placeholder="Account number" onChange={e => setField('bank_account_number', e.target.value)} /></Field>
+                  <Field label="Routing / Sort Code"><input className={inputCls(false)} value={form.bank_routing_number} placeholder="e.g. 021000021" onChange={e => setField('bank_routing_number', e.target.value)} /></Field>
+                  <Field label="SWIFT / BIC"><input className={inputCls(false)} value={form.bank_swift} placeholder="e.g. CHASUS33" onChange={e => setField('bank_swift', e.target.value)} /></Field>
+                  <Field label="IBAN"><input className={inputCls(false)} value={form.bank_iban} placeholder="e.g. NL02ABNA0123456789" onChange={e => setField('bank_iban', e.target.value)} /></Field>
+                  <Field label="Currency"><input className={inputCls(false)} value={form.bank_currency} placeholder="e.g. USD, EUR" onChange={e => setField('bank_currency', e.target.value)} /></Field>
+                </div>
+              </div>
 
               {/* Remarks */}
               <Field label="Remarks">
@@ -1180,6 +1400,8 @@ function CustomerSection({ company, showToast }) {
 // ── Supplier Section ──────────────────────────────────────────────────────────
 const EMPTY_SUPPLIER = {
   name: '',
+  supplier_code: '',
+  vat_number: '',
   address1: '', address2: '',
   country: '', state: '', postal_code: '',
   website: '',
@@ -1191,10 +1413,28 @@ const EMPTY_SUPPLIER = {
   remarks: '',
 }
 
+const SUPPLIER_REPORT_COLS = [
+  { label: 'Code',           key: 'supplier_code' },
+  { label: 'Name',           key: 'name' },
+  { label: 'VAT Number',     key: 'vat_number' },
+  { label: 'Country',        key: 'country' },
+  { label: 'State',          key: 'state' },
+  { label: 'Postal Code',    key: 'postal_code' },
+  { label: 'Website',        key: 'website' },
+  { label: 'License No.',    key: 'license_number' },
+  { label: 'Approved Date',  key: 'approved_date',  format: 'date' },
+  { label: 'Valid Through',  key: 'valid_through',  format: 'date' },
+  { label: 'Contact 1',      key: 'contact1_name' },
+  { label: 'Email 1',        key: 'contact1_email' },
+  { label: 'Phone 1',        key: 'contact1_phone' },
+  { label: 'Remarks',        key: 'remarks' },
+]
+
 function SupplierSection({ company, showToast }) {
   const [entries, setEntries]             = useState([])
   const [loading, setLoading]             = useState(true)
   const [showForm, setShowForm]           = useState(false)
+  const [showReport, setShowReport]       = useState(false)
   const [editing, setEditing]             = useState(null)
   const [form, setForm]                   = useState(EMPTY_SUPPLIER)
   const [freeTextState, setFreeTextState] = useState(false)
@@ -1269,6 +1509,7 @@ function SupplierSection({ company, showToast }) {
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Supplier updated')
     } else {
+      if (!payload.supplier_code) payload.supplier_code = await generateSupplierCode(form.country, company)
       const { error } = await supabase.from('vendors_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Supplier added')
@@ -1321,12 +1562,21 @@ function SupplierSection({ company, showToast }) {
             <p className="text-gray-400 text-xs">{entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} for {company}</p>
           </div>
         </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Add Entry
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowReport(true)}
+            className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Report
+          </button>
+          <button onClick={openAdd}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Entry
+          </button>
+        </div>
       </div>
+
+      {showReport && <MasterReportModal title="Supplier Master" rows={filtered} columns={SUPPLIER_REPORT_COLS} company={company} onClose={() => setShowReport(false)} />}
 
       {/* Search */}
       <div className="relative">
@@ -1372,6 +1622,8 @@ function SupplierSection({ company, showToast }) {
                     Supplier Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
                   {[
+                    { label: 'Code',           field: 'supplier_code' },
+                    { label: 'VAT Number',     field: null },
                     { label: 'Address 1',      field: null },
                     { label: 'Address 2',      field: null },
                     { label: 'Country',        field: 'country' },
@@ -1417,6 +1669,12 @@ function SupplierSection({ company, showToast }) {
                         <span className="font-semibold text-gray-900 whitespace-nowrap">{entry.name || '—'}</span>
                       </div>
                     </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span className="text-xs font-mono font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                        {entry.supplier_code || <span className="text-gray-300 font-sans font-normal">—</span>}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.vat_number || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.address1 || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.address2 || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.country || <span className="text-gray-300">—</span>}</td>
@@ -1487,15 +1745,24 @@ function SupplierSection({ company, showToast }) {
 
             {/* Modal body */}
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-              {/* Supplier Name */}
-              <Field label="Supplier Name *" error={errors.name}>
-                <input
-                  ref={firstInputRef}
-                  className={inputCls(!!errors.name)}
-                  value={form.name}
-                  placeholder="e.g. Global Supplies Inc"
-                  onChange={e => setField('name', e.target.value)}
-                />
+              {/* Supplier Name + Code */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <Field label="Supplier Name *" error={errors.name}>
+                    <input ref={firstInputRef} className={inputCls(!!errors.name)} value={form.name}
+                      placeholder="e.g. Global Supplies Inc" onChange={e => setField('name', e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Supplier Code">
+                  <input className={`${inputCls(false)} bg-gray-50 text-gray-500 font-mono`}
+                    value={editing ? (form.supplier_code || '—') : 'Auto-generated'} readOnly disabled />
+                </Field>
+              </div>
+
+              {/* VAT Number */}
+              <Field label="VAT Number">
+                <input className={inputCls(false)} value={form.vat_number} placeholder="e.g. NL123456789B01"
+                  onChange={e => setField('vat_number', e.target.value)} />
               </Field>
 
               {/* Address */}
@@ -1618,16 +1885,38 @@ function SupplierSection({ company, showToast }) {
 const EMPTY_PRODUCT = {
   name: '',
   product_code: '',
-  pack_size: '',
-  ndc_ma_code: '',
+  manufacturer: '',
+  material_type: '',
   country_of_origin: '',
+  ndc_ma_code: '',
+  hsn_code: '',
+  pack_size: '',
+  pack_dimension: '',
+  pack_weight: '',
+  unit_of_measurement: '',
   remarks: '',
 }
+
+const PRODUCT_REPORT_COLS = [
+  { label: 'Code',          key: 'product_code' },
+  { label: 'Name',          key: 'name' },
+  { label: 'Manufacturer',  key: 'manufacturer' },
+  { label: 'Material Type', key: 'material_type' },
+  { label: 'Country',       key: 'country_of_origin' },
+  { label: 'NDC / MA Code', key: 'ndc_ma_code' },
+  { label: 'HSN Code',      key: 'hsn_code' },
+  { label: 'Pack Size',     key: 'pack_size' },
+  { label: 'Pack Dimension',key: 'pack_dimension' },
+  { label: 'Pack Weight',   key: 'pack_weight' },
+  { label: 'UOM',           key: 'unit_of_measurement' },
+  { label: 'Remarks',       key: 'remarks' },
+]
 
 function ProductSection({ company, showToast }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
+  const [showReport, setShowReport]   = useState(false)
   const [editing, setEditing]         = useState(null)
   const [form, setForm]               = useState(EMPTY_PRODUCT)
   const [errors, setErrors]           = useState({})
@@ -1693,7 +1982,7 @@ function ProductSection({ company, showToast }) {
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Product updated')
     } else {
-      if (!payload.product_code) payload.product_code = await generateProductCode(company)
+      if (!payload.product_code) payload.product_code = await generateProductCode(form.country_of_origin, form.material_type, company)
       const { error } = await supabase.from('products_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Product added')
@@ -1742,12 +2031,21 @@ function ProductSection({ company, showToast }) {
             <p className="text-gray-400 text-xs">{entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} for {company}</p>
           </div>
         </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Add Entry
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowReport(true)}
+            className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Report
+          </button>
+          <button onClick={openAdd}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Entry
+          </button>
+        </div>
       </div>
+
+      {showReport && <MasterReportModal title="Product Master" rows={filtered} columns={PRODUCT_REPORT_COLS} company={company} onClose={() => setShowReport(false)} />}
 
       {/* Search */}
       <div className="relative">
@@ -1793,12 +2091,15 @@ function ProductSection({ company, showToast }) {
                     Product Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
                   {[
-                    { label: 'Code',              field: 'product_code' },
-                    { label: 'Pack Size',          field: null },
-                    { label: 'NDC / MA Code',      field: null },
-                    { label: 'Country of Origin',  field: 'country_of_origin' },
-                    { label: 'Remarks',            field: null },
-                    { label: 'Added',              field: 'created_at' },
+                    { label: 'Code',             field: 'product_code' },
+                    { label: 'Manufacturer',     field: 'manufacturer' },
+                    { label: 'Material Type',    field: 'material_type' },
+                    { label: 'Country',          field: 'country_of_origin' },
+                    { label: 'NDC / MA Code',    field: null },
+                    { label: 'HSN Code',         field: null },
+                    { label: 'Pack Size',        field: null },
+                    { label: 'UOM',              field: null },
+                    { label: 'Added',            field: 'created_at' },
                   ].map(({ label, field }) => (
                     <th key={label}
                         className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50${field ? ' cursor-pointer select-none' : ''}`}
@@ -1829,12 +2130,13 @@ function ProductSection({ company, showToast }) {
                         {entry.product_code || <span className="text-gray-300 font-sans font-normal">—</span>}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.pack_size || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.ndc_ma_code || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.manufacturer || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.material_type || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.country_of_origin || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[160px]">
-                      <RemarksCell text={entry.remarks} />
-                    </td>
+                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.ndc_ma_code || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.hsn_code || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.pack_size || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.unit_of_measurement || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.created_at)}</td>
                     <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-emerald-50/40"
                         style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
@@ -1874,42 +2176,80 @@ function ProductSection({ company, showToast }) {
             </div>
 
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              {/* Name + Code */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
                   <Field label="Product Name *" error={errors.name}>
-                    <input
-                      ref={firstInputRef}
-                      className={inputCls(!!errors.name)}
-                      value={form.name}
-                      placeholder="e.g. Paracetamol 500mg"
-                      onChange={e => setField('name', e.target.value)}
-                    />
+                    <input ref={firstInputRef} className={inputCls(!!errors.name)} value={form.name}
+                      placeholder="e.g. Paracetamol 500mg" onChange={e => setField('name', e.target.value)} />
                   </Field>
                 </div>
                 <Field label="Product Code">
                   <input className={`${inputCls(false)} bg-gray-50 text-gray-500 font-mono`}
-                    value={editing ? (form.product_code || '—') : 'Auto-generated'}
-                    readOnly disabled />
+                    value={editing ? (form.product_code || '—') : 'Auto-generated'} readOnly disabled />
                 </Field>
               </div>
 
-              <Field label="Pack Size">
-                <input className={inputCls(false)} value={form.pack_size} placeholder="e.g. 10×10 blister"
-                  onChange={e => setField('pack_size', e.target.value)} />
-              </Field>
+              {/* Manufacturer + Material Type */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Manufacturer">
+                  <input className={inputCls(false)} value={form.manufacturer} placeholder="e.g. Bayer AG"
+                    onChange={e => setField('manufacturer', e.target.value)} />
+                </Field>
+                <Field label="Material Type">
+                  <select className={selectCls(false)} value={form.material_type}
+                    onChange={e => setField('material_type', e.target.value)}>
+                    <option value="">Select type…</option>
+                    {MATERIAL_TYPES.map(m => <option key={m.code} value={m.label}>{m.label} ({m.code})</option>)}
+                  </select>
+                </Field>
+              </div>
 
-              <Field label="NDC / MA Product Code">
-                <input className={inputCls(false)} value={form.ndc_ma_code} placeholder="e.g. NDC 12345-678"
-                  onChange={e => setField('ndc_ma_code', e.target.value)} />
-              </Field>
+              {/* Country + NDC */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Country of Origin">
+                  <select className={selectCls(false)} value={form.country_of_origin}
+                    onChange={e => setField('country_of_origin', e.target.value)}>
+                    <option value="">Select country…</option>
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </Field>
+                <Field label="NDC / MA Product Code">
+                  <input className={inputCls(false)} value={form.ndc_ma_code} placeholder="e.g. NDC 12345-678"
+                    onChange={e => setField('ndc_ma_code', e.target.value)} />
+                </Field>
+              </div>
 
-              <Field label="Country of Origin">
-                <select className={selectCls(false)} value={form.country_of_origin}
-                  onChange={e => setField('country_of_origin', e.target.value)}>
-                  <option value="">Select country…</option>
-                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </Field>
+              {/* HSN Code + UOM */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="HSN Code">
+                  <input className={inputCls(false)} value={form.hsn_code} placeholder="e.g. 30049099"
+                    onChange={e => setField('hsn_code', e.target.value)} />
+                </Field>
+                <Field label="Unit of Measurement">
+                  <select className={selectCls(false)} value={form.unit_of_measurement}
+                    onChange={e => setField('unit_of_measurement', e.target.value)}>
+                    <option value="">Select unit…</option>
+                    {UNITS_OF_MEASUREMENT.map(u => <option key={u.code} value={u.code}>{u.label} ({u.code})</option>)}
+                  </select>
+                </Field>
+              </div>
+
+              {/* Pack Size + Pack Dimension + Pack Weight */}
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="Pack Size">
+                  <input className={inputCls(false)} value={form.pack_size} placeholder="e.g. 10×10 blister"
+                    onChange={e => setField('pack_size', e.target.value)} />
+                </Field>
+                <Field label="Pack Dimension">
+                  <input className={inputCls(false)} value={form.pack_dimension} placeholder="e.g. 100×50×30 mm"
+                    onChange={e => setField('pack_dimension', e.target.value)} />
+                </Field>
+                <Field label="Pack Weight">
+                  <input className={inputCls(false)} value={form.pack_weight} placeholder="e.g. 250g"
+                    onChange={e => setField('pack_weight', e.target.value)} />
+                </Field>
+              </div>
 
               <Field label="Remarks">
                 <textarea className={`${inputCls(false)} resize-none`} rows={3} value={form.remarks}
@@ -1945,6 +2285,7 @@ function MasterSection({ masterKey, company, showToast }) {
   const [saving, setSaving]       = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [search, setSearch]       = useState('')
+  const [showReport, setShowReport] = useState(false)
   const [sortField, setSortField] = useState('created_at')
   const [sortDir, setSortDir]     = useState('desc')
   const firstInputRef             = useRef(null)
@@ -2038,12 +2379,21 @@ function MasterSection({ masterKey, company, showToast }) {
             <p className="text-gray-400 text-xs">{entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} for {company}</p>
           </div>
         </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Add Entry
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowReport(true)}
+            className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Report
+          </button>
+          <button onClick={openAdd}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Entry
+          </button>
+        </div>
       </div>
+
+      {showReport && <MasterReportModal title={cfg.label} rows={filtered} columns={cfg.columns.map(c => ({ label: c.label, key: c.key, format: c.format }))} company={company} onClose={() => setShowReport(false)} />}
 
       {/* Search */}
       <div className="relative">
@@ -2188,10 +2538,29 @@ const EMPTY_CO = {
   bank_iban: '', bank_currency: '',
 }
 
+const COMPANY_REPORT_COLS = [
+  { label: 'Company',        key: 'company' },
+  { label: 'Legal Name',     key: 'legal_name' },
+  { label: 'Tax ID',         key: 'tax_id' },
+  { label: 'VAT Number',     key: 'vat_number' },
+  { label: 'Address',        key: 'address1' },
+  { label: 'City',           key: 'city' },
+  { label: 'Country',        key: 'country' },
+  { label: 'Phone',          key: 'phone' },
+  { label: 'Email',          key: 'email' },
+  { label: 'Website',        key: 'website' },
+  { label: 'Bank Name',      key: 'bank_name' },
+  { label: 'Account Name',   key: 'bank_account_name' },
+  { label: 'Account No.',    key: 'bank_account_number' },
+  { label: 'SWIFT',          key: 'bank_swift' },
+  { label: 'IBAN',           key: 'bank_iban' },
+]
+
 function CompanyMaster({ showToast }) {
   const [activeKey, setActiveKey]   = useState(COMPANY_PROFILES[0].key)
   const [profiles, setProfiles]     = useState({})
   const [editing, setEditing]       = useState(false)
+  const [showReport, setShowReport] = useState(false)
   const [form, setForm]             = useState(EMPTY_CO)
   const [saving, setSaving]         = useState(false)
   const [loading, setLoading]       = useState(true)
@@ -2333,11 +2702,21 @@ function CompanyMaster({ showToast }) {
               <h3 className="font-bold text-gray-900 text-lg">{COMPANY_PROFILES.find(c => c.key === activeKey)?.short}</h3>
               <p className="text-xs text-gray-400 mt-0.5">{activeKey}</p>
             </div>
-            <button onClick={startEdit}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition shadow-sm">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              {hasData ? 'Edit Profile' : 'Add Profile'}
-            </button>
+            <div className="flex gap-2">
+              {hasData && (
+                <button onClick={() => setShowReport(true)}
+                  className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium transition shadow-sm">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  Report
+                </button>
+              )}
+              <button onClick={startEdit}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition shadow-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                {hasData ? 'Edit Profile' : 'Add Profile'}
+              </button>
+            </div>
+            {showReport && <MasterReportModal title="Company Master" rows={Object.values(profiles)} columns={COMPANY_REPORT_COLS} company="All Companies" onClose={() => setShowReport(false)} />}
           </div>
 
           {!hasData ? (
@@ -2391,6 +2770,104 @@ function CompanyMaster({ showToast }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Master Report Modal ───────────────────────────────────────────────────────
+function MasterReportModal({ title, rows, columns, company, onClose }) {
+  const [format, setFormat] = useState('excel')
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(() => {
+    const fn = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', fn); return () => window.removeEventListener('keydown', fn)
+  }, [onClose])
+
+  async function generate() {
+    setGenerating(true)
+    const headers = columns.map(c => c.label)
+    const body    = rows.map(r => columns.map(c => {
+      const v = r[c.key]
+      if (v == null || v === '') return '—'
+      if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+      if (c.format === 'date') return formatDate(v)
+      return String(v)
+    }))
+    const safeCompany = company.replace(/[^a-zA-Z0-9]/g, '-')
+    const safeTitle   = title.replace(/\s+/g, '-')
+    const dateTag     = new Date().toISOString().split('T')[0]
+
+    if (format === 'excel') {
+      const wsData = [headers, ...body]
+      const ws     = XLSX.utils.aoa_to_sheet(wsData)
+      ws['!cols']  = headers.map((h, i) => ({
+        wch: Math.max(h.length, ...body.map(row => (row[i] || '').length)) + 2
+      }))
+      const range = XLSX.utils.decode_range(ws['!ref'])
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })]
+        if (cell) cell.s = { font: { bold: true } }
+      }
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, title)
+      XLSX.writeFile(wb, `JRS-${safeCompany}-${safeTitle}-${dateTag}.xlsx`)
+    } else {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold')
+      doc.text(company, 40, 36)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(120)
+      doc.text(`${title} Report`, 40, 50)
+      doc.text(`Generated: ${new Date().toLocaleString()}  ·  ${rows.length} records`, 40, 62)
+      doc.setTextColor(0)
+      autoTable(doc, {
+        head: [headers], body,
+        startY: 76,
+        styles: { fontSize: 7, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 40, right: 40 },
+      })
+      doc.save(`JRS-${safeCompany}-${safeTitle}-${dateTag}.pdf`)
+    }
+    setGenerating(false)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Export {title}</h2>
+            <p className="text-gray-400 text-xs mt-0.5">{rows.length} records · {company}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="flex gap-3">
+            {[{ id: 'excel', label: 'Excel (.xlsx)' }, { id: 'pdf', label: 'PDF (.pdf)' }].map(f => (
+              <button key={f.id} onClick={() => setFormat(f.id)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition ${format === f.id ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="bg-gray-50 rounded-xl px-4 py-2.5 text-xs text-gray-500">
+            All visible columns will be included in the export.
+          </div>
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+          <button onClick={generate} disabled={generating || rows.length === 0}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+            {generating && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {generating ? 'Exporting…' : 'Export'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

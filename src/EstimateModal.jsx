@@ -461,17 +461,34 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     setBankOpen(false)
     setToast(null)
 
+    // Load company profile from DB, fall back to hardcoded config
     const cfg = COMPANY_CONFIG[resolveCompany(company)]
-    setCoAddress(cfg.address)
-    setCoWebsite(cfg.website)
-    setBankBeneficiary(cfg.bank.beneficiary)
-    setBankName(cfg.bank.bank)
-    setBankAddr(cfg.bank.address)
-    setBankAccount(cfg.bank.account)
-    setBankRoutingACH(cfg.bank.routingACH)
-    setBankRoutingWire(cfg.bank.routingWire)
-    setBankSwift(cfg.bank.swift)
-    setBankIban(cfg.bank.iban)
+    supabase.from('company_master').select('*').eq('company', company).single().then(({ data: cm }) => {
+      if (cm) {
+        const addrParts = [cm.address1, cm.address2, cm.city, cm.state, cm.postal_code, cm.country].filter(Boolean)
+        setCoAddress(addrParts.join(', '))
+        setCoWebsite([cm.website, cm.phone].filter(Boolean).join(' | '))
+        setBankBeneficiary(cm.bank_account_name || cfg.bank.beneficiary)
+        setBankName(cm.bank_name || cfg.bank.bank)
+        setBankAddr(cm.bank_address || cfg.bank.address)
+        setBankAccount(cm.bank_account_number || cfg.bank.account)
+        setBankRoutingACH(cm.bank_routing_number || cfg.bank.routingACH)
+        setBankRoutingWire(cm.bank_routing_number || cfg.bank.routingWire)
+        setBankSwift(cm.bank_swift || cfg.bank.swift)
+        setBankIban(cm.bank_iban || cfg.bank.iban)
+      } else {
+        setCoAddress(cfg.address)
+        setCoWebsite(cfg.website)
+        setBankBeneficiary(cfg.bank.beneficiary)
+        setBankName(cfg.bank.bank)
+        setBankAddr(cfg.bank.address)
+        setBankAccount(cfg.bank.account)
+        setBankRoutingACH(cfg.bank.routingACH)
+        setBankRoutingWire(cfg.bank.routingWire)
+        setBankSwift(cfg.bank.swift)
+        setBankIban(cfg.bank.iban)
+      }
+    })
 
     setLineItems(
       selectedInquiries.map((inq, i) => ({
