@@ -51,10 +51,20 @@ create table if not exists customers_master (
 );
 
 -- Migration: add new columns to customers_master if table already exists
-alter table customers_master add column if not exists customer_code   text;
-alter table customers_master add column if not exists bill_to_address text;
-alter table customers_master add column if not exists ship_to_address text;
-alter table customers_master add column if not exists is_approved     boolean default false;
+alter table customers_master add column if not exists customer_code    text;
+alter table customers_master add column if not exists bill_to_address  text;
+alter table customers_master add column if not exists ship_to_address  text;
+alter table customers_master add column if not exists is_approved      boolean default false;
+alter table customers_master add column if not exists pending_approval    boolean default false;
+alter table customers_master add column if not exists submitted_by        text;
+alter table customers_master add column if not exists bill_to_country     text;
+alter table customers_master add column if not exists bill_to_state       text;
+alter table customers_master add column if not exists bill_to_city        text;
+alter table customers_master add column if not exists bill_to_postal_code text;
+alter table customers_master add column if not exists ship_to_country     text;
+alter table customers_master add column if not exists ship_to_state       text;
+alter table customers_master add column if not exists ship_to_city        text;
+alter table customers_master add column if not exists ship_to_postal_code text;
 
 -- Vendor / Supplier Master
 create table if not exists vendors_master (

@@ -4,7 +4,10 @@ import Inquiries from './Inquiries'
 import Masters from './Masters'
 import Estimates from './Estimates'
 import DashboardPage from './Dashboard'
+import AdminModule from './Admin'
 import { supabase } from './supabase'
+
+const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah']
 
 const COMPANIES = [
   'Jupiter Research Services Inc',
@@ -51,6 +54,7 @@ function Particles() {
 function App() {
   const [activePage, setActivePage]       = useState('dashboard')
   const [showChangePassword, setShowChangePassword] = useState(false)
+  const [pendingCount, setPendingCount]   = useState(0)
 
   // Restore session from localStorage on first load
   const savedUser    = (() => { try { return JSON.parse(localStorage.getItem('jrs_user'))    } catch { return null } })()
@@ -60,6 +64,9 @@ function App() {
   const [currentUser, setCurrentUser]         = useState(savedUser)
   const [selectedCompany, setSelectedCompany] = useState(savedCompany || '')
   const [theme, setTheme]                     = useState(savedTheme)
+  const [notifications, setNotifications]     = useState([])
+
+  const isAdmin = ADMIN_USERS.includes(currentUser?.name)
 
   function toggleTheme() {
     const next = theme === 'light' ? 'dark' : 'light'
@@ -81,6 +88,53 @@ function App() {
     localStorage.removeItem('jrs_company')
     setCurrentUser(null)
     setSelectedCompany('')
+  }
+
+  // Poll pending approval count for admins
+  useEffect(() => {
+    if (!isLoggedIn || !isAdmin || !selectedCompany) return
+    async function fetchPending() {
+      const { count } = await supabase
+        .from('customers_master')
+        .select('id', { count: 'exact', head: true })
+        .eq('company', selectedCompany)
+        .eq('pending_approval', true)
+      setPendingCount(count || 0)
+    }
+    fetchPending()
+    const interval = setInterval(fetchPending, 30000)
+    return () => clearInterval(interval)
+  }, [isLoggedIn, isAdmin, selectedCompany])
+
+  // Notifications: fetch + realtime
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.name) return
+    async function fetchNotifications() {
+      const { data } = await supabase.from('notifications')
+        .select('*').eq('recipient_name', currentUser.name)
+        .order('created_at', { ascending: false }).limit(50)
+      setNotifications(data || [])
+    }
+    fetchNotifications()
+    const channel = supabase.channel(`notifs-${currentUser.name}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `recipient_name=eq.${currentUser.name}` },
+        payload => setNotifications(prev => [payload.new, ...prev]))
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [isLoggedIn, currentUser?.name])
+
+  const unreadCount = notifications.filter(n => !n.is_read).length
+
+  async function markAllRead() {
+    const unread = notifications.filter(n => !n.is_read).map(n => n.id)
+    if (!unread.length) return
+    await supabase.from('notifications').update({ is_read: true }).in('id', unread)
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+  }
+
+  async function markOneRead(id) {
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
   }
 
   // Auto-logout after 10 minutes of inactivity
@@ -114,6 +168,12 @@ function App() {
         onChangePassword={() => setShowChangePassword(true)}
         theme={theme}
         toggleTheme={toggleTheme}
+        isAdmin={isAdmin}
+        pendingCount={pendingCount}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkAllRead={markAllRead}
+        onMarkOneRead={markOneRead}
       />
       {showChangePassword && (
         <ChangePasswordModal
@@ -586,7 +646,7 @@ function FeedbackWidget({ currentUser, company, theme }) {
 }
 
 // ── Sidebar nav button ────────────────────────────────────────────────────────
-function SidebarNavBtn({ label, icon, comingSoon, active, collapsed, indent, onClick }) {
+function SidebarNavBtn({ label, icon, comingSoon, active, collapsed, indent, onClick, badge }) {
   return (
     <button
       onClick={comingSoon ? undefined : onClick}
@@ -608,14 +668,27 @@ function SidebarNavBtn({ label, icon, comingSoon, active, collapsed, indent, onC
         transition: 'background 0.15s, color 0.15s',
         marginBottom: 1,
         textAlign: 'left',
+        position: 'relative',
       }}
       onMouseEnter={e => { if (!active && !comingSoon) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'white' } }}
       onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = active ? 'white' : 'rgba(255,255,255,0.5)' } }}
     >
-      <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
+      <span style={{ flexShrink: 0, display: 'flex', position: 'relative' }}>
+        {icon}
+        {badge && collapsed && (
+          <span style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'white' }}>
+            {badge > 9 ? '9+' : badge}
+          </span>
+        )}
+      </span>
       {!collapsed && (
         <>
           <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{label}</span>
+          {badge && (
+            <span style={{ fontSize: 10, background: '#f97316', color: 'white', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
+              {badge}
+            </span>
+          )}
           {comingSoon && (
             <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.35)', padding: '2px 5px', borderRadius: 4, fontWeight: 600, letterSpacing: '0.06em' }}>
               SOON
@@ -706,10 +779,12 @@ function MyProfileModal({ currentUser, selectedCompany, onClose, onNameUpdate })
   )
 }
 
-function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword, theme, toggleTheme }) {
+function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword, theme, toggleTheme, isAdmin, pendingCount, notifications, unreadCount, onMarkAllRead, onMarkOneRead }) {
   const [collapsed, setCollapsed]             = useState(false)
   const [showProfile, setShowProfile]         = useState(false)
   const [showUserMenu, setShowUserMenu]       = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const notifRef = useRef(null)
   const [erpOpen, setErpOpen]                 = useState(activePage.startsWith('erp-'))
   const [showCompanyPicker, setShowCompanyPicker] = useState(false)
   const [companyPickerPos, setCompanyPickerPos] = useState(null)
@@ -750,6 +825,13 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
     return () => document.removeEventListener('mousedown', fn)
   }, [showCompanyPicker])
 
+  useEffect(() => {
+    if (!showNotifications) return
+    const fn = e => { if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [showNotifications])
+
   const companyShort = selectedCompany.includes('India') ? 'Jupiter R.S. India'
     : selectedCompany.includes('BV') ? 'Jupiter R.S. BV' : 'Jupiter R.S. Inc'
   const companyTag = selectedCompany.includes('India') ? 'INDIA'
@@ -774,6 +856,11 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
       id: 'wms', label: 'WMS', comingSoon: true,
       icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" /></svg>,
     },
+    ...(isAdmin ? [{
+      id: 'admin', label: 'Admin',
+      icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+      badge: pendingCount > 0 ? pendingCount : null,
+    }] : []),
   ]
 
   const ERP_SUB = [
@@ -1084,7 +1171,8 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
       <main style={{ flex: 1, overflowY: 'auto', background: theme === 'dark' ? '#070e1b' : '#f1f5f9', display: 'flex', flexDirection: 'column' }}>
         {activePage === 'dashboard'     && <DashboardPage currentUser={currentUser} company={selectedCompany} setActivePage={setActivePage} />}
         {activePage === 'inquiries'     && <Inquiries company={selectedCompany} currentUser={currentUser} />}
-        {activePage === 'masters'       && <Masters company={selectedCompany} />}
+        {activePage === 'masters'       && <Masters company={selectedCompany} currentUser={currentUser} isAdmin={isAdmin} />}
+        {activePage === 'admin'         && isAdmin && <AdminModule company={selectedCompany} />}
         {activePage === 'erp-estimates' && <Estimates company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'wms' && (
           <div style={{ padding: 32 }}>
@@ -1100,6 +1188,99 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
       )}
 
       <FeedbackWidget currentUser={currentUser} company={selectedCompany} theme={theme} />
+
+      {/* ── Notification Bell ── */}
+      <div ref={notifRef} style={{ position: 'fixed', top: 14, right: 16, zIndex: 10000 }}>
+        <button
+          onClick={() => setShowNotifications(v => !v)}
+          style={{
+            position: 'relative',
+            width: 36, height: 36,
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: showNotifications ? 'rgba(255,255,255,0.15)' : 'rgba(10,22,40,0.85)',
+            backdropFilter: 'blur(8px)',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(255,255,255,0.8)',
+            transition: 'background 0.15s',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}
+          onMouseEnter={e => { if (!showNotifications) e.currentTarget.style.background = 'rgba(255,255,255,0.12)' }}
+          onMouseLeave={e => { if (!showNotifications) e.currentTarget.style.background = 'rgba(10,22,40,0.85)' }}
+          title="Notifications"
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -4, right: -4,
+              background: '#ef4444', color: 'white',
+              fontSize: 9, fontWeight: 700,
+              minWidth: 16, height: 16, borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 3px',
+              border: '1.5px solid white',
+            }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {showNotifications && (
+          <div style={{
+            position: 'absolute', top: 44, right: 0,
+            width: 320,
+            background: 'white',
+            borderRadius: 14,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08)',
+            border: '1px solid #e5e7eb',
+            overflow: 'hidden',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid #f3f4f6' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Notifications</span>
+              {unreadCount > 0 && (
+                <button onClick={onMarkAllRead} style={{ fontSize: 11, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+                  Mark all read
+                </button>
+              )}
+            </div>
+            <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+              {notifications.length === 0 ? (
+                <div style={{ padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+                  No notifications yet
+                </div>
+              ) : notifications.map(n => (
+                <div
+                  key={n.id}
+                  onClick={() => onMarkOneRead(n.id)}
+                  style={{
+                    padding: '10px 14px',
+                    borderBottom: '1px solid #f9fafb',
+                    background: n.is_read ? 'white' : '#eff6ff',
+                    cursor: n.is_read ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'flex-start', gap: 10,
+                    transition: 'background 0.12s',
+                  }}
+                >
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%',
+                    background: n.is_read ? '#d1d5db' : '#3b82f6',
+                    flexShrink: 0, marginTop: 5,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 12, color: '#111827', margin: 0, lineHeight: 1.5 }}>{n.message}</p>
+                    <p style={{ fontSize: 10, color: '#9ca3af', margin: '3px 0 0' }}>
+                      {new Date(n.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

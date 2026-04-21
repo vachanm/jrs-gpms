@@ -5,6 +5,8 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from './supabase'
 
+const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah']
+
 // ── Countries & States ────────────────────────────────────────────────────────
 const COUNTRIES = [
   'Afghanistan','Albania','Algeria','Argentina','Australia','Austria',
@@ -139,6 +141,72 @@ const STATES_BY_COUNTRY = {
   ],
 }
 
+const CITIES_BY_COUNTRY = {
+  'Afghanistan': ['Kabul','Kandahar','Herat','Mazar-i-Sharif','Jalalabad'],
+  'Albania': ['Tirana','Durrës','Vlorë','Shkodër','Fier'],
+  'Algeria': ['Algiers','Oran','Constantine','Annaba','Blida'],
+  'Argentina': ['Buenos Aires','Córdoba','Rosario','Mendoza','La Plata','Mar del Plata','Tucumán','Salta'],
+  'Australia': ['Sydney','Melbourne','Brisbane','Perth','Adelaide','Gold Coast','Canberra','Newcastle','Hobart'],
+  'Austria': ['Vienna','Graz','Linz','Salzburg','Innsbruck','Klagenfurt'],
+  'Bangladesh': ['Dhaka','Chittagong','Khulna','Rajshahi','Sylhet','Comilla'],
+  'Belgium': ['Brussels','Antwerp','Ghent','Bruges','Liège','Leuven'],
+  'Brazil': ['São Paulo','Rio de Janeiro','Brasília','Salvador','Fortaleza','Belo Horizonte','Manaus','Curitiba','Porto Alegre'],
+  'Canada': ['Toronto','Montreal','Vancouver','Calgary','Edmonton','Ottawa','Winnipeg','Quebec City','Hamilton'],
+  'Chile': ['Santiago','Valparaíso','Concepción','La Serena','Antofagasta','Temuco'],
+  'China': ['Beijing','Shanghai','Guangzhou','Shenzhen','Chengdu','Hangzhou','Wuhan','Xi\'an','Nanjing','Tianjin','Chongqing','Suzhou'],
+  'Colombia': ['Bogotá','Medellín','Cali','Barranquilla','Cartagena','Cúcuta'],
+  'Croatia': ['Zagreb','Split','Rijeka','Osijek','Zadar'],
+  'Czech Republic': ['Prague','Brno','Ostrava','Plzeň','Liberec'],
+  'Denmark': ['Copenhagen','Aarhus','Odense','Aalborg','Esbjerg'],
+  'Egypt': ['Cairo','Alexandria','Giza','Luxor','Aswan','Sharm el-Sheikh'],
+  'Ethiopia': ['Addis Ababa','Dire Dawa','Mekelle','Gondar','Hawassa'],
+  'Finland': ['Helsinki','Espoo','Tampere','Vantaa','Oulu','Turku'],
+  'France': ['Paris','Lyon','Marseille','Toulouse','Nice','Nantes','Bordeaux','Strasbourg','Lille','Rennes'],
+  'Germany': ['Berlin','Hamburg','Munich','Cologne','Frankfurt','Stuttgart','Düsseldorf','Leipzig','Dortmund','Bremen'],
+  'Ghana': ['Accra','Kumasi','Tamale','Sekondi-Takoradi','Cape Coast'],
+  'Greece': ['Athens','Thessaloniki','Patras','Heraklion','Larissa'],
+  'Hungary': ['Budapest','Debrecen','Miskolc','Szeged','Pécs'],
+  'India': ['Mumbai','Delhi','Bengaluru','Hyderabad','Ahmedabad','Chennai','Kolkata','Pune','Jaipur','Surat','Lucknow','Kanpur','Nagpur','Indore','Bhopal','Visakhapatnam','Coimbatore','Vadodara','Gurgaon','Noida'],
+  'Indonesia': ['Jakarta','Surabaya','Bandung','Medan','Semarang','Makassar','Palembang','Tangerang','Depok','Bekasi'],
+  'Iran': ['Tehran','Mashhad','Isfahan','Karaj','Tabriz','Shiraz'],
+  'Iraq': ['Baghdad','Basra','Mosul','Erbil','Kirkuk','Najaf'],
+  'Ireland': ['Dublin','Cork','Limerick','Galway','Waterford'],
+  'Israel': ['Jerusalem','Tel Aviv','Haifa','Rishon LeZion','Petah Tikva','Ashdod'],
+  'Italy': ['Rome','Milan','Naples','Turin','Palermo','Genoa','Bologna','Florence','Venice','Bari'],
+  'Japan': ['Tokyo','Osaka','Nagoya','Sapporo','Fukuoka','Kobe','Kyoto','Yokohama','Hiroshima','Sendai'],
+  'Jordan': ['Amman','Zarqa','Irbid','Aqaba','Madaba'],
+  'Kenya': ['Nairobi','Mombasa','Kisumu','Nakuru','Eldoret'],
+  'Malaysia': ['Kuala Lumpur','George Town','Ipoh','Shah Alam','Johor Bahru','Malacca','Kota Kinabalu','Kuching'],
+  'Mexico': ['Mexico City','Guadalajara','Monterrey','Puebla','Tijuana','León','Juárez','Zapopan','Mérida'],
+  'Morocco': ['Casablanca','Rabat','Fes','Marrakech','Tangier','Agadir'],
+  'Netherlands': ['Amsterdam','Rotterdam','The Hague','Utrecht','Eindhoven','Tilburg','Groningen'],
+  'New Zealand': ['Auckland','Wellington','Christchurch','Hamilton','Tauranga','Dunedin'],
+  'Nigeria': ['Lagos','Kano','Ibadan','Abuja','Port Harcourt','Benin City','Kaduna'],
+  'Norway': ['Oslo','Bergen','Trondheim','Stavanger','Tromsø'],
+  'Pakistan': ['Karachi','Lahore','Faisalabad','Rawalpindi','Islamabad','Multan','Peshawar','Quetta'],
+  'Philippines': ['Manila','Quezon City','Cebu','Davao','Zamboanga','Taguig','Antipolo'],
+  'Poland': ['Warsaw','Kraków','Wrocław','Gdańsk','Poznań','Szczecin','Łódź'],
+  'Portugal': ['Lisbon','Porto','Braga','Setúbal','Coimbra','Funchal'],
+  'Romania': ['Bucharest','Cluj-Napoca','Timișoara','Iași','Brașov','Constanța'],
+  'Russia': ['Moscow','Saint Petersburg','Novosibirsk','Yekaterinburg','Kazan','Nizhny Novgorod','Vladivostok'],
+  'Saudi Arabia': ['Riyadh','Jeddah','Mecca','Medina','Dammam','Khobar','Tabuk'],
+  'Singapore': ['Singapore'],
+  'South Africa': ['Johannesburg','Cape Town','Durban','Pretoria','Port Elizabeth','Bloemfontein'],
+  'South Korea': ['Seoul','Busan','Incheon','Daegu','Daejeon','Gwangju','Suwon'],
+  'Spain': ['Madrid','Barcelona','Valencia','Seville','Zaragoza','Málaga','Bilbao','Alicante'],
+  'Sri Lanka': ['Colombo','Kandy','Galle','Jaffna','Negombo','Trincomalee'],
+  'Sweden': ['Stockholm','Gothenburg','Malmö','Uppsala','Västerås','Örebro'],
+  'Switzerland': ['Zurich','Geneva','Basel','Bern','Lausanne','Winterthur','Lucerne'],
+  'Taiwan': ['Taipei','Kaohsiung','Taichung','Tainan','Hsinchu','Keelung'],
+  'Thailand': ['Bangkok','Chiang Mai','Phuket','Pattaya','Chonburi','Khon Kaen'],
+  'Turkey': ['Istanbul','Ankara','Izmir','Bursa','Antalya','Adana','Gaziantep'],
+  'Ukraine': ['Kyiv','Kharkiv','Odessa','Dnipro','Lviv','Zaporizhzhia'],
+  'United Arab Emirates': ['Dubai','Abu Dhabi','Sharjah','Ajman','Ras Al Khaimah','Fujairah'],
+  'United Kingdom': ['London','Birmingham','Manchester','Glasgow','Leeds','Liverpool','Bristol','Sheffield','Edinburgh','Cardiff'],
+  'United States': ['New York','Los Angeles','Chicago','Houston','Phoenix','Philadelphia','San Antonio','San Diego','Dallas','San Jose','Austin','Jacksonville','Fort Worth','Columbus','Charlotte','Indianapolis','San Francisco','Seattle','Denver','Nashville','Boston','Washington DC','Las Vegas','Portland','Miami','Atlanta'],
+  'Vietnam': ['Ho Chi Minh City','Hanoi','Da Nang','Hai Phong','Can Tho','Nha Trang'],
+}
+
 // ── Master config (vendors / products / storage) ──────────────────────────────
 const MASTERS = {
   vendors: {
@@ -218,7 +286,7 @@ function formatDate(iso) {
     const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''))
     const day = String(d.getDate()).padStart(2, '0')
     const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
-    return `${day}-${mon}-${d.getFullYear()}`
+    return `${day}/${mon}/${d.getFullYear()}`
   } catch { return iso }
 }
 
@@ -541,7 +609,9 @@ const EMPTY_CUSTOMER = {
   name: '',
   customer_code: '',
   bill_to_address: '',
+  bill_to_country: '', bill_to_state: '', bill_to_city: '', bill_to_postal_code: '',
   ship_to_address: '',
+  ship_to_country: '', ship_to_state: '', ship_to_city: '', ship_to_postal_code: '',
   country: '', state: '', postal_code: '',
   website: '',
   valid_date: '',
@@ -860,12 +930,19 @@ function MasterImportModal({ file, tableKey, company, onClose, onImported }) {
 }
 
 const CUSTOMER_REPORT_COLS = [
-  { label: 'Code',           key: 'customer_code' },
-  { label: 'Name',           key: 'name' },
-  { label: 'Country',        key: 'country' },
-  { label: 'State',          key: 'state' },
-  { label: 'Postal Code',    key: 'postal_code' },
-  { label: 'Website',        key: 'website' },
+  { label: 'Code',              key: 'customer_code' },
+  { label: 'Name',              key: 'name' },
+  { label: 'Bill To Address',   key: 'bill_to_address' },
+  { label: 'Bill Country',      key: 'bill_to_country' },
+  { label: 'Bill State',        key: 'bill_to_state' },
+  { label: 'Bill City',         key: 'bill_to_city' },
+  { label: 'Bill Postal',       key: 'bill_to_postal_code' },
+  { label: 'Ship To Address',   key: 'ship_to_address' },
+  { label: 'Ship Country',      key: 'ship_to_country' },
+  { label: 'Ship State',        key: 'ship_to_state' },
+  { label: 'Ship City',         key: 'ship_to_city' },
+  { label: 'Ship Postal',       key: 'ship_to_postal_code' },
+  { label: 'Website',           key: 'website' },
   { label: 'Valid Date',     key: 'valid_date',     format: 'date' },
   { label: 'Approved',       key: 'is_approved' },
   { label: 'Approved Date',  key: 'approved_date',  format: 'date' },
@@ -879,14 +956,166 @@ const CUSTOMER_REPORT_COLS = [
   { label: 'Remarks',        key: 'remarks' },
 ]
 
-function CustomerSection({ company, showToast }) {
+// ── Attachments Modal ─────────────────────────────────────────────────────────
+function AttachmentsModal({ entityId, entityType, entityName, company, currentUser, onClose }) {
+  const [files, setFiles]       = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef            = useRef(null)
+
+  useEffect(() => {
+    fetchFiles()
+    const fn = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [])
+
+  async function fetchFiles() {
+    setLoading(true)
+    const { data } = await supabase.from('attachments')
+      .select('*').eq('entity_id', entityId).order('created_at', { ascending: false })
+    setFiles(data || [])
+    setLoading(false)
+  }
+
+  async function uploadFiles(fileList) {
+    if (!fileList?.length) return
+    setUploading(true)
+    for (const file of Array.from(fileList)) {
+      const path = `${entityType}/${entityId}/${Date.now()}_${file.name}`
+      const { error: storageErr } = await supabase.storage.from('master-attachments').upload(path, file)
+      if (storageErr) { alert(`Upload failed: ${storageErr.message}`); continue }
+      await supabase.from('attachments').insert({
+        entity_type: entityType, entity_id: entityId,
+        file_name: file.name, file_path: path,
+        file_size: file.size, mime_type: file.type,
+        uploaded_by: currentUser?.name || '', company,
+      })
+    }
+    setUploading(false)
+    fetchFiles()
+  }
+
+  async function handleDelete(file) {
+    if (!confirm(`Delete "${file.file_name}"?`)) return
+    await supabase.storage.from('master-attachments').remove([file.file_path])
+    await supabase.from('attachments').delete().eq('id', file.id)
+    setFiles(prev => prev.filter(f => f.id !== file.id))
+  }
+
+  async function handleDownload(file) {
+    const { data } = await supabase.storage.from('master-attachments').createSignedUrl(file.file_path, 3600)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+
+  function formatSize(bytes) {
+    if (!bytes) return '—'
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  function fileIcon(mime) {
+    if (!mime) return '📄'
+    if (mime.includes('pdf')) return '📕'
+    if (mime.includes('word') || mime.includes('document')) return '📘'
+    if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv')) return '📗'
+    if (mime.includes('image')) return '🖼️'
+    if (mime.includes('zip') || mime.includes('rar')) return '🗜️'
+    return '📄'
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Attachments</h2>
+            <p className="text-gray-400 text-xs mt-0.5 truncate max-w-[360px]">{entityName}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Upload zone */}
+        <div className="px-6 pt-4 shrink-0">
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); uploadFiles(e.dataTransfer.files) }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}
+          >
+            <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => uploadFiles(e.target.files)} />
+            {uploading ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-blue-600 font-medium">Uploading…</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                <p className="text-sm text-gray-500">Drop files here or <span className="text-blue-600 font-medium">click to browse</span></p>
+                <p className="text-xs text-gray-400">PDF, Word, Excel, images — any file type</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* File list */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : files.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No attachments yet</div>
+          ) : files.map(file => (
+            <div key={file.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition group">
+              <span className="text-xl shrink-0">{fileIcon(file.mime_type)}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{file.file_name}</p>
+                <p className="text-xs text-gray-400">{formatSize(file.file_size)} · {new Date(file.created_at).toLocaleDateString()} · {file.uploaded_by || '—'}</p>
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                <button onClick={() => handleDownload(file)}
+                  className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Download
+                </button>
+                <button onClick={() => handleDelete(file)}
+                  className="flex items-center gap-1 text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 pb-5 pt-3 border-t border-gray-100 shrink-0">
+          <button onClick={onClose} className="w-full border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Close</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function CustomerSection({ company, showToast, isAdmin, currentUser }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
   const [showReport, setShowReport]   = useState(false)
   const [editing, setEditing]         = useState(null)
   const [form, setForm]               = useState(EMPTY_CUSTOMER)
-  const [freeTextState, setFreeTextState] = useState(false)
+  const [freeTextBillState, setFreeTextBillState] = useState(false)
+  const [freeTextShipState, setFreeTextShipState] = useState(false)
+  const [manualBillAddress, setManualBillAddress] = useState(false)
+  const [manualShipAddress, setManualShipAddress] = useState(false)
   const [errors, setErrors]           = useState({})
   const [saving, setSaving]           = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
@@ -895,6 +1124,8 @@ function CustomerSection({ company, showToast }) {
   const [sortField, setSortField]     = useState('created_at')
   const [sortDir, setSortDir]         = useState('desc')
   const [importFile, setImportFile]   = useState(null)
+  const [visibleContacts, setVisibleContacts] = useState(1)
+  const [attachmentEntry, setAttachmentEntry] = useState(null)
   const firstInputRef                 = useRef(null)
   const importFileRef                 = useRef(null)
 
@@ -922,18 +1153,24 @@ function CustomerSection({ company, showToast }) {
     setLoading(false)
   }
 
-  function closeForm() { setShowForm(false); setEditing(null); setForm(EMPTY_CUSTOMER); setErrors({}); setFreeTextState(false) }
+  function closeForm() { setShowForm(false); setEditing(null); setForm(EMPTY_CUSTOMER); setErrors({}); setFreeTextBillState(false); setFreeTextShipState(false); setManualBillAddress(false); setManualShipAddress(false); setVisibleContacts(1) }
 
-  function openAdd() { setEditing(null); setForm(EMPTY_CUSTOMER); setErrors({}); setFreeTextState(false); setShowForm(true) }
+  function openAdd() { setEditing(null); setForm(EMPTY_CUSTOMER); setErrors({}); setFreeTextBillState(false); setFreeTextShipState(false); setManualBillAddress(false); setManualShipAddress(false); setVisibleContacts(1); setShowForm(true) }
 
   function openEdit(entry) {
     setEditing(entry)
-    const presets = STATES_BY_COUNTRY[entry.country] || []
-    setFreeTextState(!!(entry.state && !presets.includes(entry.state)))
+    const billPresets = STATES_BY_COUNTRY[entry.bill_to_country] || []
+    const shipPresets = STATES_BY_COUNTRY[entry.ship_to_country] || []
+    setFreeTextBillState(!!(entry.bill_to_state && !billPresets.includes(entry.bill_to_state)))
+    setFreeTextShipState(!!(entry.ship_to_state && !shipPresets.includes(entry.ship_to_state)))
+    setManualBillAddress(!entry.bill_to_country && !!entry.bill_to_address)
+    setManualShipAddress(!entry.ship_to_country && !!entry.ship_to_address)
     const f = Object.fromEntries(Object.keys(EMPTY_CUSTOMER).map(k => [k, entry[k] ?? '']))
     f.is_approved = !!entry.is_approved
     setForm(f)
     setErrors({})
+    const contactCount = entry.contact3_name ? 3 : entry.contact2_name ? 2 : 1
+    setVisibleContacts(contactCount)
     setShowForm(true)
   }
 
@@ -942,10 +1179,14 @@ function CustomerSection({ company, showToast }) {
     setErrors(prev => ({ ...prev, [key]: '' }))
   }
 
-  function handleCountryChange(val) {
-    setForm(prev => ({ ...prev, country: val, state: '' }))
-    setFreeTextState(false)
-    setErrors(prev => ({ ...prev, country: '' }))
+  function handleBillCountryChange(val) {
+    setForm(prev => ({ ...prev, bill_to_country: val, bill_to_state: '' }))
+    setFreeTextBillState(false)
+  }
+
+  function handleShipCountryChange(val) {
+    setForm(prev => ({ ...prev, ship_to_country: val, ship_to_state: '' }))
+    setFreeTextShipState(false)
   }
 
   function validate() {
@@ -955,20 +1196,39 @@ function CustomerSection({ company, showToast }) {
     return e
   }
 
-  async function save() {
+  async function save(sendForApproval = false) {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
     setSaving(true)
+    const DATE_FIELDS = ['valid_date', 'approved_date']
     const payload = { ...form, company }
+    DATE_FIELDS.forEach(f => { if (payload[f] === '') payload[f] = null })
     if (editing) {
+      if (isAdmin) payload.pending_approval = false
       const { error } = await supabase.from('customers_master').update(payload).eq('id', editing.id)
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       showToast('Customer updated')
     } else {
       if (!payload.customer_code) payload.customer_code = await generateCustomerCode(form.country, company)
+      if (sendForApproval) {
+        payload.pending_approval = true
+        payload.submitted_by = currentUser?.name || ''
+        payload.is_approved = false
+      } else {
+        payload.pending_approval = false
+      }
       const { error } = await supabase.from('customers_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
-      showToast('Customer added')
+      if (sendForApproval) {
+        await supabase.from('notifications').insert(
+          ADMIN_USERS.map(name => ({
+            recipient_name: name,
+            message: `Customer "${form.name}" was submitted for approval by ${currentUser?.name || 'a user'}`,
+            company,
+          }))
+        )
+      }
+      showToast(sendForApproval ? 'Sent for approval' : 'Customer added')
     }
     setSaving(false); closeForm(); fetchEntries()
   }
@@ -987,8 +1247,10 @@ function CustomerSection({ company, showToast }) {
       return (
         e.name?.toLowerCase().includes(q) ||
         e.customer_code?.toLowerCase().includes(q) ||
-        e.country?.toLowerCase().includes(q) ||
-        e.state?.toLowerCase().includes(q) ||
+        e.bill_to_country?.toLowerCase().includes(q) ||
+        e.bill_to_city?.toLowerCase().includes(q) ||
+        e.ship_to_country?.toLowerCase().includes(q) ||
+        e.ship_to_city?.toLowerCase().includes(q) ||
         e.contact1_name?.toLowerCase().includes(q) ||
         e.contact1_email?.toLowerCase().includes(q)
       )
@@ -996,7 +1258,8 @@ function CustomerSection({ company, showToast }) {
     sortField, sortDir
   )
 
-  const hasPresetStates = !!(STATES_BY_COUNTRY[form.country]?.length)
+  const hasBillPresetStates = !!(STATES_BY_COUNTRY[form.bill_to_country]?.length)
+  const hasShipPresetStates = !!(STATES_BY_COUNTRY[form.ship_to_country]?.length)
 
   return (
     <div className="space-y-4">
@@ -1025,7 +1288,7 @@ function CustomerSection({ company, showToast }) {
             <p className="text-gray-400 text-xs">{entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} for {company}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" style={{ paddingRight: 52 }}>
           <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
             onChange={e => { if (e.target.files[0]) { setImportFile(e.target.files[0]); e.target.value = '' } }} />
           <button onClick={() => importFileRef.current?.click()}
@@ -1102,22 +1365,13 @@ function CustomerSection({ company, showToast }) {
                     Customer Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
                   {[
-                    { label: 'Code',           field: 'customer_code' },
-                    { label: 'Bill To Address',field: null },
-                    { label: 'Ship To Address',field: null },
-                    { label: 'Country',        field: 'country' },
-                    { label: 'State',          field: null },
-                    { label: 'Postal Code',    field: null },
-                    { label: 'Website',        field: null },
+                    { label: 'Code',              field: 'customer_code' },
+                    { label: 'Bill To Address',   field: null },
+                    { label: 'Ship To Address',   field: null },
+                    { label: 'Website',           field: null },
                     { label: 'Contact 1 Name', field: null },
                     { label: 'Contact 1 Email',field: null },
                     { label: 'Contact 1 Phone',field: null },
-                    { label: 'Contact 2 Name', field: null },
-                    { label: 'Contact 2 Email',field: null },
-                    { label: 'Contact 2 Phone',field: null },
-                    { label: 'Contact 3 Name', field: null },
-                    { label: 'Contact 3 Email',field: null },
-                    { label: 'Contact 3 Phone',field: null },
                     { label: 'Approved Date',  field: 'approved_date' },
                     { label: 'Added',          field: 'created_at' },
                     { label: 'Remarks',        field: null },
@@ -1157,9 +1411,6 @@ function CustomerSection({ company, showToast }) {
                     </td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[180px]"><RemarksCell text={entry.bill_to_address} /></td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[180px]"><RemarksCell text={entry.ship_to_address} /></td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.country || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.state || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.postal_code || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       {entry.website
                         ? <a href={entry.website.startsWith('http') ? entry.website : `https://${entry.website}`}
@@ -1172,12 +1423,6 @@ function CustomerSection({ company, showToast }) {
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact1_name || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact1_email || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact1_phone || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact2_name || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact2_email || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact2_phone || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact3_name || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact3_email || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact3_phone || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.approved_date)}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.created_at)}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[160px]">
@@ -1185,14 +1430,40 @@ function CustomerSection({ company, showToast }) {
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-blue-50"
                         style={{ position: 'sticky', right: 140, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.04)' }}>
-                      <ApprovalBadge entry={entry} onToggle={async (id, val) => {
-                        await supabase.from('customers_master').update({ is_approved: val }).eq('id', id)
-                        fetchEntries()
-                      }} />
+                      {entry.pending_approval ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border text-orange-700 bg-orange-50 border-orange-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                          Pending Approval
+                        </span>
+                      ) : (
+                        isAdmin ? (
+                          <ApprovalBadge entry={entry} onToggle={async (id, val) => {
+                            await supabase.from('customers_master').update({ is_approved: val, pending_approval: false }).eq('id', id)
+                            if (val && entry.submitted_by) {
+                              await supabase.from('notifications').insert({
+                                recipient_name: entry.submitted_by,
+                                message: `Customer "${entry.name}" has been approved`,
+                                company,
+                              })
+                            }
+                            fetchEntries()
+                          }} />
+                        ) : (
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${entry.is_approved ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${entry.is_approved ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            {entry.is_approved ? 'Approved' : 'Unapproved'}
+                          </span>
+                        )
+                      )}
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-blue-50"
                         style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button onClick={() => setAttachmentEntry(entry)}
+                          className="flex items-center gap-1 text-gray-500 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                          Files
+                        </button>
                         <button onClick={() => openEdit(entry)}
                           className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -1211,6 +1482,17 @@ function CustomerSection({ company, showToast }) {
             </table>
           </div>
         </div>
+      )}
+
+      {attachmentEntry && (
+        <AttachmentsModal
+          entityId={attachmentEntry.id}
+          entityType="customer"
+          entityName={attachmentEntry.name}
+          company={company}
+          currentUser={currentUser}
+          onClose={() => setAttachmentEntry(null)}
+        />
       )}
 
       {/* ── Add / Edit Modal ── */}
@@ -1250,79 +1532,157 @@ function CustomerSection({ company, showToast }) {
                 </Field>
               </div>
 
-              {/* Approval status */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Approval Status</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Mark customer as approved for order processing</p>
+              {/* Approval status — admins only */}
+              {isAdmin && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Approval Status</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Mark customer as approved for order processing</p>
+                    </div>
+                    <button type="button"
+                      onClick={() => {
+                        const next = !form.is_approved
+                        setField('is_approved', next)
+                        if (next && !form.approved_date) setField('approved_date', new Date().toISOString().split('T')[0])
+                        if (!next) setField('approved_date', '')
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_approved ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.is_approved ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
                   </div>
-                  <button type="button"
-                    onClick={() => {
-                      const next = !form.is_approved
-                      setField('is_approved', next)
-                      if (next && !form.approved_date) setField('approved_date', new Date().toISOString().split('T')[0])
-                      if (!next) setField('approved_date', '')
-                    }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_approved ? 'bg-emerald-500' : 'bg-gray-300'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.is_approved ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
+                  {form.is_approved && (
+                    <Field label="Approved Date *" error={errors.approved_date}>
+                      <input type="date" className={inputCls(!!errors.approved_date)} value={form.approved_date}
+                        onChange={e => setField('approved_date', e.target.value)} />
+                    </Field>
+                  )}
                 </div>
-                {form.is_approved && (
-                  <Field label="Approved Date *" error={errors.approved_date}>
-                    <input type="date" className={inputCls(!!errors.approved_date)} value={form.approved_date}
-                      onChange={e => setField('approved_date', e.target.value)} />
-                  </Field>
-                )}
-              </div>
+              )}
 
               {/* Addresses */}
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Bill To Address">
-                  <textarea className={`${inputCls(false)} resize-none`} rows={3} value={form.bill_to_address}
-                    placeholder="Full billing address"
-                    onChange={e => setField('bill_to_address', e.target.value)} />
-                </Field>
-                <Field label="Ship To Address">
-                  <textarea className={`${inputCls(false)} resize-none`} rows={3} value={form.ship_to_address}
-                    placeholder="Full shipping address"
-                    onChange={e => setField('ship_to_address', e.target.value)} />
-                </Field>
-              </div>
-
-              {/* Country / State / Postal */}
-              <div className="grid grid-cols-3 gap-4">
-                <Field label="Country">
-                  <select className={selectCls(false)} value={form.country} onChange={e => handleCountryChange(e.target.value)}>
-                    <option value="">Select country…</option>
-                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </Field>
-                <Field label="State / Province">
-                  <div className="flex gap-2">
-                    {hasPresetStates && !freeTextState ? (
-                      <select className={`${selectCls(false)} flex-1`} value={form.state} onChange={e => setField('state', e.target.value)}>
-                        <option value="">Select state…</option>
-                        {STATES_BY_COUNTRY[form.country].map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ) : (
-                      <input className={`${inputCls(false)} flex-1`} value={form.state} placeholder="Enter state…"
-                        onChange={e => setField('state', e.target.value)} />
-                    )}
-                    {hasPresetStates && (
-                      <button
-                        type="button"
-                        title={freeTextState ? 'Switch to dropdown' : 'Switch to free text'}
-                        onClick={() => { setFreeTextState(p => !p); setField('state', '') }}
-                        className="px-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition text-sm"
-                      >✎</button>
-                    )}
+                {/* Bill To */}
+                <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Bill To</p>
+                    <button type="button"
+                      onClick={() => { setManualBillAddress(p => !p); setField('bill_to_country', ''); setField('bill_to_state', ''); setField('bill_to_city', ''); setField('bill_to_postal_code', ''); setFreeTextBillState(false) }}
+                      className="text-xs text-blue-600 hover:underline">
+                      {manualBillAddress ? 'Use structured fields' : 'Type manually'}
+                    </button>
                   </div>
-                </Field>
-                <Field label="Postal Code">
-                  <input className={inputCls(false)} value={form.postal_code} placeholder="e.g. 10001"
-                    onChange={e => setField('postal_code', e.target.value)} />
-                </Field>
+                  {manualBillAddress ? (
+                    <Field label="Full Address">
+                      <textarea className={`${inputCls(false)} resize-none`} rows={5} value={form.bill_to_address}
+                        placeholder="Type full billing address…"
+                        onChange={e => setField('bill_to_address', e.target.value)} />
+                    </Field>
+                  ) : (
+                    <>
+                      <Field label="Street / Building">
+                        <textarea className={`${inputCls(false)} resize-none`} rows={2} value={form.bill_to_address}
+                          placeholder="Street / building…"
+                          onChange={e => setField('bill_to_address', e.target.value)} />
+                      </Field>
+                      <Field label="Country">
+                        <select className={selectCls(false)} value={form.bill_to_country} onChange={e => handleBillCountryChange(e.target.value)}>
+                          <option value="">Select country…</option>
+                          {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="State / Province">
+                        <div className="flex gap-2">
+                          {hasBillPresetStates && !freeTextBillState ? (
+                            <select className={`${selectCls(false)} flex-1`} value={form.bill_to_state} onChange={e => setField('bill_to_state', e.target.value)}>
+                              <option value="">Select state…</option>
+                              {STATES_BY_COUNTRY[form.bill_to_country].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          ) : (
+                            <input className={`${inputCls(false)} flex-1`} value={form.bill_to_state} placeholder="Enter state…"
+                              onChange={e => setField('bill_to_state', e.target.value)} />
+                          )}
+                          {hasBillPresetStates && (
+                            <button type="button" title={freeTextBillState ? 'Switch to dropdown' : 'Switch to free text'}
+                              onClick={() => { setFreeTextBillState(p => !p); setField('bill_to_state', '') }}
+                              className="px-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition text-sm">✎</button>
+                          )}
+                        </div>
+                      </Field>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="City">
+                          <input className={inputCls(false)} value={form.bill_to_city} placeholder="e.g. New York"
+                            onChange={e => setField('bill_to_city', e.target.value)} />
+                        </Field>
+                        <Field label="Postal Code">
+                          <input className={inputCls(false)} value={form.bill_to_postal_code} placeholder="e.g. 10001"
+                            onChange={e => setField('bill_to_postal_code', e.target.value)} />
+                        </Field>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Ship To */}
+                <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Ship To</p>
+                    <button type="button"
+                      onClick={() => { setManualShipAddress(p => !p); setField('ship_to_country', ''); setField('ship_to_state', ''); setField('ship_to_city', ''); setField('ship_to_postal_code', ''); setFreeTextShipState(false) }}
+                      className="text-xs text-blue-600 hover:underline">
+                      {manualShipAddress ? 'Use structured fields' : 'Type manually'}
+                    </button>
+                  </div>
+                  {manualShipAddress ? (
+                    <Field label="Full Address">
+                      <textarea className={`${inputCls(false)} resize-none`} rows={5} value={form.ship_to_address}
+                        placeholder="Type full shipping address…"
+                        onChange={e => setField('ship_to_address', e.target.value)} />
+                    </Field>
+                  ) : (
+                    <>
+                      <Field label="Street / Building">
+                        <textarea className={`${inputCls(false)} resize-none`} rows={2} value={form.ship_to_address}
+                          placeholder="Street / building…"
+                          onChange={e => setField('ship_to_address', e.target.value)} />
+                      </Field>
+                      <Field label="Country">
+                        <select className={selectCls(false)} value={form.ship_to_country} onChange={e => handleShipCountryChange(e.target.value)}>
+                          <option value="">Select country…</option>
+                          {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="State / Province">
+                        <div className="flex gap-2">
+                          {hasShipPresetStates && !freeTextShipState ? (
+                            <select className={`${selectCls(false)} flex-1`} value={form.ship_to_state} onChange={e => setField('ship_to_state', e.target.value)}>
+                              <option value="">Select state…</option>
+                              {STATES_BY_COUNTRY[form.ship_to_country].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          ) : (
+                            <input className={`${inputCls(false)} flex-1`} value={form.ship_to_state} placeholder="Enter state…"
+                              onChange={e => setField('ship_to_state', e.target.value)} />
+                          )}
+                          {hasShipPresetStates && (
+                            <button type="button" title={freeTextShipState ? 'Switch to dropdown' : 'Switch to free text'}
+                              onClick={() => { setFreeTextShipState(p => !p); setField('ship_to_state', '') }}
+                              className="px-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition text-sm">✎</button>
+                          )}
+                        </div>
+                      </Field>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="City">
+                          <input className={inputCls(false)} value={form.ship_to_city} placeholder="e.g. Amsterdam"
+                            onChange={e => setField('ship_to_city', e.target.value)} />
+                        </Field>
+                        <Field label="Postal Code">
+                          <input className={inputCls(false)} value={form.ship_to_postal_code} placeholder="e.g. 1011 AB"
+                            onChange={e => setField('ship_to_postal_code', e.target.value)} />
+                        </Field>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Website + Valid Date */}
@@ -1338,9 +1698,15 @@ function CustomerSection({ company, showToast }) {
               </div>
 
               {/* Contact blocks */}
-              {[1, 2, 3].map(n => (
+              {Array.from({ length: visibleContacts }, (_, i) => i + 1).map(n => (
                 <div key={n} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact {n}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact {n}</p>
+                    {n > 1 && (
+                      <button type="button" onClick={() => { setField(`contact${n}_name`, ''); setField(`contact${n}_email`, ''); setField(`contact${n}_phone`, ''); setVisibleContacts(n - 1) }}
+                        className="text-xs text-red-400 hover:text-red-600 transition">Remove</button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-3 gap-3">
                     <Field label="Name">
                       <input className={inputCls(false)} value={form[`contact${n}_name`]} placeholder="Full name"
@@ -1357,6 +1723,13 @@ function CustomerSection({ company, showToast }) {
                   </div>
                 </div>
               ))}
+              {visibleContacts < 3 && (
+                <button type="button" onClick={() => setVisibleContacts(v => v + 1)}
+                  className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add Contact
+                </button>
+              )}
 
               {/* Bank Details */}
               <div className="border border-gray-100 rounded-xl p-4 space-y-4">
@@ -1384,11 +1757,19 @@ function CustomerSection({ company, showToast }) {
             {/* Modal footer */}
             <div className="flex gap-3 px-6 pb-5 pt-4 border-t border-gray-100 shrink-0">
               <button onClick={closeForm} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
-              <button onClick={save} disabled={saving}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
-                {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                {saving ? 'Saving…' : editing ? 'Update' : 'Save'}
-              </button>
+              {!isAdmin && !editing ? (
+                <button onClick={() => save(true)} disabled={saving}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+                  {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {saving ? 'Sending…' : 'Send for Approval'}
+                </button>
+              ) : (
+                <button onClick={() => save(false)} disabled={saving}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
+                  {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {saving ? 'Saving…' : editing ? 'Update' : 'Save'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1430,7 +1811,7 @@ const SUPPLIER_REPORT_COLS = [
   { label: 'Remarks',        key: 'remarks' },
 ]
 
-function SupplierSection({ company, showToast }) {
+function SupplierSection({ company, showToast, currentUser }) {
   const [entries, setEntries]             = useState([])
   const [loading, setLoading]             = useState(true)
   const [showForm, setShowForm]           = useState(false)
@@ -1444,6 +1825,8 @@ function SupplierSection({ company, showToast }) {
   const [search, setSearch]               = useState('')
   const [sortField, setSortField]         = useState('created_at')
   const [sortDir, setSortDir]             = useState('desc')
+  const [visibleContacts, setVisibleContacts] = useState(1)
+  const [attachmentEntry, setAttachmentEntry] = useState(null)
   const firstInputRef                     = useRef(null)
 
   function toggleSort(f) {
@@ -1470,8 +1853,8 @@ function SupplierSection({ company, showToast }) {
     setLoading(false)
   }
 
-  function closeForm() { setShowForm(false); setEditing(null); setForm(EMPTY_SUPPLIER); setErrors({}); setFreeTextState(false) }
-  function openAdd()   { setEditing(null); setForm(EMPTY_SUPPLIER); setErrors({}); setFreeTextState(false); setShowForm(true) }
+  function closeForm() { setShowForm(false); setEditing(null); setForm(EMPTY_SUPPLIER); setErrors({}); setFreeTextState(false); setVisibleContacts(1) }
+  function openAdd()   { setEditing(null); setForm(EMPTY_SUPPLIER); setErrors({}); setFreeTextState(false); setVisibleContacts(1); setShowForm(true) }
 
   function openEdit(entry) {
     setEditing(entry)
@@ -1479,6 +1862,7 @@ function SupplierSection({ company, showToast }) {
     setFreeTextState(!!(entry.state && !presets.includes(entry.state)))
     setForm(Object.fromEntries(Object.keys(EMPTY_SUPPLIER).map(k => [k, entry[k] || ''])))
     setErrors({})
+    setVisibleContacts(entry.contact3_name ? 3 : entry.contact2_name ? 2 : 1)
     setShowForm(true)
   }
 
@@ -1624,11 +2008,7 @@ function SupplierSection({ company, showToast }) {
                   {[
                     { label: 'Code',           field: 'supplier_code' },
                     { label: 'VAT Number',     field: null },
-                    { label: 'Address 1',      field: null },
-                    { label: 'Address 2',      field: null },
-                    { label: 'Country',        field: 'country' },
-                    { label: 'State',          field: null },
-                    { label: 'Postal Code',    field: null },
+                    { label: 'Address',        field: null },
                     { label: 'Website',        field: null },
                     { label: 'Contact 1 Name', field: null },
                     { label: 'Contact 1 Email',field: null },
@@ -1675,11 +2055,9 @@ function SupplierSection({ company, showToast }) {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.vat_number || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.address1 || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.address2 || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.country || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.state || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.postal_code || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap max-w-[160px]">
+                      {(() => { const addr = [entry.address1, entry.state, entry.country, entry.postal_code].filter(Boolean).join(', '); return addr ? <span className="block truncate" title={addr}>{addr}</span> : <span className="text-gray-300">—</span> })()}
+                    </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       {entry.website
                         ? <a href={entry.website.startsWith('http') ? entry.website : `https://${entry.website}`}
@@ -1708,6 +2086,11 @@ function SupplierSection({ company, showToast }) {
                     <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-purple-50/40"
                         style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button onClick={() => setAttachmentEntry(entry)}
+                          className="flex items-center gap-1 text-gray-500 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                          Files
+                        </button>
                         <button onClick={() => openEdit(entry)}
                           className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -1726,6 +2109,17 @@ function SupplierSection({ company, showToast }) {
             </table>
           </div>
         </div>
+      )}
+
+      {attachmentEntry && (
+        <AttachmentsModal
+          entityId={attachmentEntry.id}
+          entityType="supplier"
+          entityName={attachmentEntry.name}
+          company={company}
+          currentUser={currentUser}
+          onClose={() => setAttachmentEntry(null)}
+        />
       )}
 
       {/* ── Add / Edit Modal ── */}
@@ -1766,50 +2160,46 @@ function SupplierSection({ company, showToast }) {
               </Field>
 
               {/* Address */}
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Address Line 1">
-                  <input className={inputCls(false)} value={form.address1} placeholder="Street address"
-                    onChange={e => setField('address1', e.target.value)} />
-                </Field>
-                <Field label="Address Line 2">
-                  <input className={inputCls(false)} value={form.address2} placeholder="Suite, floor, etc."
-                    onChange={e => setField('address2', e.target.value)} />
-                </Field>
-              </div>
-
-              {/* Country / State / Postal */}
-              <div className="grid grid-cols-3 gap-4">
-                <Field label="Country">
-                  <select className={selectCls(false)} value={form.country} onChange={e => handleCountryChange(e.target.value)}>
-                    <option value="">Select country…</option>
-                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </Field>
-                <Field label="State / Province">
-                  <div className="flex gap-2">
-                    {hasPresetStates && !freeTextState ? (
-                      <select className={`${selectCls(false)} flex-1`} value={form.state} onChange={e => setField('state', e.target.value)}>
-                        <option value="">Select state…</option>
-                        {STATES_BY_COUNTRY[form.country].map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ) : (
-                      <input className={`${inputCls(false)} flex-1`} value={form.state} placeholder="Enter state…"
-                        onChange={e => setField('state', e.target.value)} />
-                    )}
-                    {hasPresetStates && (
-                      <button
-                        type="button"
-                        title={freeTextState ? 'Switch to dropdown' : 'Switch to free text'}
-                        onClick={() => { setFreeTextState(p => !p); setField('state', '') }}
-                        className="px-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition text-sm"
-                      >✎</button>
-                    )}
-                  </div>
-                </Field>
-                <Field label="Postal Code">
-                  <input className={inputCls(false)} value={form.postal_code} placeholder="e.g. 10001"
-                    onChange={e => setField('postal_code', e.target.value)} />
-                </Field>
+              <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Address</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Country">
+                    <select className={selectCls(false)} value={form.country} onChange={e => handleCountryChange(e.target.value)}>
+                      <option value="">Select country…</option>
+                      {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="State / Province">
+                    <div className="flex gap-2">
+                      {hasPresetStates && !freeTextState ? (
+                        <select className={`${selectCls(false)} flex-1`} value={form.state} onChange={e => setField('state', e.target.value)}>
+                          <option value="">Select state…</option>
+                          {STATES_BY_COUNTRY[form.country].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      ) : (
+                        <input className={`${inputCls(false)} flex-1`} value={form.state} placeholder="Enter state…"
+                          onChange={e => setField('state', e.target.value)} />
+                      )}
+                      {hasPresetStates && (
+                        <button type="button" title={freeTextState ? 'Switch to dropdown' : 'Switch to free text'}
+                          onClick={() => { setFreeTextState(p => !p); setField('state', '') }}
+                          className="px-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition text-sm">✎</button>
+                      )}
+                    </div>
+                  </Field>
+                  <Field label="City">
+                    <input className={inputCls(false)} value={form.address1} placeholder="e.g. New York"
+                      list="supplier-cities" autoComplete="off"
+                      onChange={e => setField('address1', e.target.value)} />
+                    <datalist id="supplier-cities">
+                      {(CITIES_BY_COUNTRY[form.country] || []).map(c => <option key={c} value={c} />)}
+                    </datalist>
+                  </Field>
+                  <Field label="Postal Code">
+                    <input className={inputCls(false)} value={form.postal_code} placeholder="e.g. 10001"
+                      onChange={e => setField('postal_code', e.target.value)} />
+                  </Field>
+                </div>
               </div>
 
               {/* Website */}
@@ -1819,9 +2209,15 @@ function SupplierSection({ company, showToast }) {
               </Field>
 
               {/* Contact blocks */}
-              {[1, 2, 3].map(n => (
+              {Array.from({ length: visibleContacts }, (_, i) => i + 1).map(n => (
                 <div key={n} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact {n}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact {n}</p>
+                    {n > 1 && (
+                      <button type="button" onClick={() => { setField(`contact${n}_name`, ''); setField(`contact${n}_email`, ''); setField(`contact${n}_phone`, ''); setVisibleContacts(n - 1) }}
+                        className="text-xs text-red-400 hover:text-red-600 transition">Remove</button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-3 gap-3">
                     <Field label="Name">
                       <input className={inputCls(false)} value={form[`contact${n}_name`]} placeholder="Full name"
@@ -1838,6 +2234,13 @@ function SupplierSection({ company, showToast }) {
                   </div>
                 </div>
               ))}
+              {visibleContacts < 3 && (
+                <button type="button" onClick={() => setVisibleContacts(v => v + 1)}
+                  className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add Contact
+                </button>
+              )}
 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
@@ -2873,7 +3276,7 @@ function MasterReportModal({ title, rows, columns, company, onClose }) {
 }
 
 // ── Main Masters Component ────────────────────────────────────────────────────
-export default function Masters({ company }) {
+export default function Masters({ company, currentUser, isAdmin }) {
   const [activeTab, setActiveTab] = useState('customers')
   const [toast, setToast]         = useState(null)
 
@@ -2909,9 +3312,9 @@ export default function Masters({ company }) {
         {activeTab === 'company'
           ? <CompanyMaster key="company" showToast={showToast} />
           : activeTab === 'customers'
-            ? <CustomerSection key="customers" company={company} showToast={showToast} />
+            ? <CustomerSection key="customers" company={company} showToast={showToast} currentUser={currentUser} isAdmin={isAdmin} />
             : activeTab === 'vendors'
-              ? <SupplierSection key="vendors" company={company} showToast={showToast} />
+              ? <SupplierSection key="vendors" company={company} showToast={showToast} currentUser={currentUser} />
               : activeTab === 'products'
                 ? <ProductSection key="products" company={company} showToast={showToast} />
                 : <MasterSection key={activeTab} masterKey={activeTab} company={company} showToast={showToast} />

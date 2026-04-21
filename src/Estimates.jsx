@@ -15,7 +15,10 @@ const STATUS_STYLES = {
 function formatDate(iso) {
   if (!iso) return '—'
   try {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''))
+    const day = String(d.getDate()).padStart(2, '0')
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+    return `${day}/${mon}/${d.getFullYear()}`
   } catch { return iso }
 }
 

@@ -55,7 +55,12 @@ function calcMargin(quotePrice, purchasePrice) {
 
 function formatDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  try {
+    const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''))
+    const day = String(d.getDate()).padStart(2, '0')
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+    return `${day}/${mon}/${d.getFullYear()}`
+  } catch { return iso }
 }
 
 function autoDetectMapping(headers) {
@@ -853,7 +858,7 @@ function ReportModal({ inquiries, company, masterCustomers, masterProducts, user
       ...r,
       _margin: calcMargin(r.quote_price, r.purchase_price) != null
         ? `${calcMargin(r.quote_price, r.purchase_price)}%` : '—',
-      date_added: r.date_added ? new Date(r.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      date_added: formatDate(r.date_added),
     }))
   }
 
@@ -1345,7 +1350,7 @@ export default function Inquiries({ company, currentUser }) {
             <h1 className="text-2xl font-bold text-gray-900">Inquiries</h1>
             <p className="text-gray-400 text-sm mt-0.5">{company}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" style={{ paddingRight: 52 }}>
             <button onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
               <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

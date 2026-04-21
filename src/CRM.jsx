@@ -514,7 +514,12 @@ export default function CRM() {
 
   function formatDate(iso) {
     if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    try {
+      const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''))
+      const day = String(d.getDate()).padStart(2, '0')
+      const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+      return `${day}/${mon}/${d.getFullYear()}`
+    } catch { return iso }
   }
 
   function handleFileChange(e) {
