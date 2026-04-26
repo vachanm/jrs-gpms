@@ -10,6 +10,22 @@ function saveTasks(userId, tasks) {
   localStorage.setItem(`jrs_tasks_${userId}`, JSON.stringify(tasks))
 }
 
+function formatDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso + 'T00:00:00')
+  const day = String(d.getDate()).padStart(2, '0')
+  const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+  return `${day}/${mon}/${d.getFullYear()}`
+}
+
+function dueDateStatus(dueDate, done) {
+  const today = new Date().toISOString().split('T')[0]
+  if (done) return { label: `📅 ${formatDate(dueDate)}`, colorClass: 'text-gray-400' }
+  if (dueDate < today) return { label: `⚠ Overdue · ${formatDate(dueDate)}`, colorClass: 'text-red-500' }
+  if (dueDate === today) return { label: '📅 Due today', colorClass: 'text-amber-600' }
+  return { label: `📅 ${formatDate(dueDate)}`, colorClass: 'text-blue-500' }
+}
+
 const PRIORITY_STYLE = {
   high:   'bg-red-50 text-red-600 border border-red-200',
   medium: 'bg-amber-50 text-amber-600 border border-amber-200',
@@ -19,13 +35,18 @@ const PRIORITY_DOT = { high: 'bg-red-500', medium: 'bg-amber-500', low: 'bg-emer
 
 // ── Tasks Card ────────────────────────────────────────────────────────────────
 function TasksCard({ currentUser }) {
-  const [tasks, setTasks]       = useState(() => loadTasks(currentUser.id))
-  const [input, setInput]       = useState('')
-  const [priority, setPriority] = useState('medium')
-  const [filter, setFilter]     = useState('all')
-  const [editId, setEditId]     = useState(null)
-  const [editText, setEditText] = useState('')
-  const inputRef                = useRef(null)
+  const [tasks, setTasks]           = useState(() => loadTasks(currentUser.id))
+  const [input, setInput]           = useState('')
+  const [priority, setPriority]     = useState('medium')
+  const [dueDate, setDueDate]       = useState('')
+  const [filter, setFilter]         = useState('all')
+  const [editId, setEditId]         = useState(null)
+  const [editText, setEditText]     = useState('')
+  const [editDueDate, setEditDueDate] = useState('')
+  const inputRef        = useRef(null)
+  const dueDateRef      = useRef(null)
+  const editDueDateRef  = useRef(null)
+  const suppressBlurRef = useRef(false)
 
   function persist(next) {
     setTasks(next)
@@ -35,8 +56,9 @@ function TasksCard({ currentUser }) {
   function addTask() {
     const text = input.trim()
     if (!text) return
-    persist([{ id: Date.now().toString(), text, done: false, priority, createdAt: new Date().toISOString() }, ...tasks])
+    persist([{ id: Date.now().toString(), text, done: false, priority, createdAt: new Date().toISOString(), dueDate: dueDate || null }, ...tasks])
     setInput('')
+    setDueDate('')
     inputRef.current?.focus()
   }
 
@@ -55,13 +77,15 @@ function TasksCard({ currentUser }) {
   function startEdit(task) {
     setEditId(task.id)
     setEditText(task.text)
+    setEditDueDate(task.dueDate || '')
   }
 
   function saveEdit(id) {
     const text = editText.trim()
     if (!text) { setEditId(null); return }
-    persist(tasks.map(t => t.id === id ? { ...t, text } : t))
+    persist(tasks.map(t => t.id === id ? { ...t, text, dueDate: editDueDate || null } : t))
     setEditId(null)
+    setEditDueDate('')
   }
 
   const filtered = tasks.filter(t =>
@@ -107,6 +131,25 @@ function TasksCard({ currentUser }) {
           <option value="medium">🟡 Medium</option>
           <option value="low">🟢 Low</option>
         </select>
+
+        {/* Due date picker */}
+        <input ref={dueDateRef} type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="sr-only" tabIndex={-1} />
+        <div
+          onClick={() => dueDateRef.current?.showPicker?.()}
+          className={`shrink-0 flex items-center gap-1.5 border rounded-lg px-2.5 py-2 text-xs cursor-pointer transition whitespace-nowrap ${
+            dueDate ? 'border-blue-300 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-400 hover:border-gray-300 bg-white'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          {dueDate ? formatDate(dueDate) : 'Due date'}
+          {dueDate && (
+            <span onClick={e => { e.stopPropagation(); setDueDate('') }}
+              className="ml-0.5 text-blue-400 hover:text-blue-700 font-bold leading-none">×</span>
+          )}
+        </div>
+
         <input
           ref={inputRef}
           type="text"
@@ -158,18 +201,50 @@ function TasksCard({ currentUser }) {
             {/* Text */}
             <div className="flex-1 min-w-0">
               {editId === task.id ? (
-                <input
-                  autoFocus
-                  value={editText}
-                  onChange={e => setEditText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(task.id); if (e.key === 'Escape') setEditId(null) }}
-                  onBlur={() => saveEdit(task.id)}
-                  className="w-full text-sm border-b border-blue-400 focus:outline-none bg-transparent"
-                />
+                <div>
+                  <input
+                    autoFocus
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(task.id); if (e.key === 'Escape') setEditId(null) }}
+                    onBlur={() => { if (!suppressBlurRef.current) saveEdit(task.id); suppressBlurRef.current = false }}
+                    className="w-full text-sm border-b border-blue-400 focus:outline-none bg-transparent"
+                  />
+                  <div className="flex items-center gap-2 mt-1">
+                    <input ref={editDueDateRef} type="date" value={editDueDate}
+                      onChange={e => setEditDueDate(e.target.value)} className="sr-only" tabIndex={-1} />
+                    <div
+                      onMouseDown={() => { suppressBlurRef.current = true }}
+                      onClick={() => editDueDateRef.current?.showPicker?.()}
+                      className={`flex items-center gap-1 text-[10px] cursor-pointer px-1.5 py-0.5 rounded border transition ${
+                        editDueDate ? 'border-blue-200 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-400 hover:border-gray-300 bg-gray-50'
+                      }`}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {editDueDate ? formatDate(editDueDate) : 'Set due date'}
+                    </div>
+                    {editDueDate && (
+                      <button
+                        onMouseDown={() => { suppressBlurRef.current = true }}
+                        onClick={() => setEditDueDate('')}
+                        className="text-[10px] text-gray-400 hover:text-red-500 transition"
+                      >Remove</button>
+                    )}
+                  </div>
+                </div>
               ) : (
-                <span className={`text-sm ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                  {task.text}
-                </span>
+                <>
+                  <span className={`text-sm ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                    {task.text}
+                  </span>
+                  {task.dueDate && (
+                    <p className={`text-[10px] mt-0.5 font-medium ${dueDateStatus(task.dueDate, task.done).colorClass}`}>
+                      {dueDateStatus(task.dueDate, task.done).label}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 

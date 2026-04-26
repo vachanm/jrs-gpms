@@ -413,6 +413,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
   console.log('[EstimateModal] company prop:', company, '→ resolved key:', resolveCompany(company))
 
   const estNum = useRef(generateEstimateNumber())
+  const validTillRef = useRef(null)
   const today = new Date().toISOString().split('T')[0]
 
   const [billToMode, setBillToMode] = useState('pick')
@@ -459,6 +460,22 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     estNum.current = generateEstimateNumber()
     setBillToMode('pick'); setBillToName(''); setBillToAddr1(''); setBillToAddr2(''); setBillToCountry('')
     setShipToMode('pick'); setShipToName(''); setShipToAddr1(''); setShipToAddr2(''); setShipToCountry('')
+
+    // Auto-fill addresses from the first inquiry's customer
+    if (selectedInquiries.length > 0 && selectedInquiries[0].customer) {
+      const customerName = selectedInquiries[0].customer
+      const c = masterCustomers.find(x => x.name === customerName)
+      setBillToName(customerName)
+      setShipToName(customerName)
+      if (c) {
+        setBillToAddr1(c.bill_to_address || '')
+        setBillToAddr2([c.bill_to_city, c.bill_to_state, c.bill_to_postal_code].filter(Boolean).join(', '))
+        setBillToCountry(c.bill_to_country || '')
+        setShipToAddr1(c.ship_to_address || '')
+        setShipToAddr2([c.ship_to_city, c.ship_to_state, c.ship_to_postal_code].filter(Boolean).join(', '))
+        setShipToCountry(c.ship_to_country || '')
+      }
+    }
     setPoNo(''); setPayTermsMode('pick'); setPayTerms('Net 30'); setPayTermsManual('')
     setValidTill(''); setIncotermsMode('pick'); setIncoterms('ExW'); setIncotermsManual('')
     setNote('')
@@ -527,13 +544,21 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
   function pickBillTo(name) {
     setBillToName(name)
     const c = masterCustomers.find(x => x.name === name)
-    if (c) { setBillToAddr1(c.address1 || ''); setBillToAddr2(c.address2 || ''); setBillToCountry(c.country || '') }
+    if (c) {
+      setBillToAddr1(c.bill_to_address || '')
+      setBillToAddr2([c.bill_to_city, c.bill_to_state, c.bill_to_postal_code].filter(Boolean).join(', '))
+      setBillToCountry(c.bill_to_country || '')
+    }
   }
 
   function pickShipTo(name) {
     setShipToName(name)
     const c = masterCustomers.find(x => x.name === name)
-    if (c) { setShipToAddr1(c.address1 || ''); setShipToAddr2(c.address2 || ''); setShipToCountry(c.country || '') }
+    if (c) {
+      setShipToAddr1(c.ship_to_address || '')
+      setShipToAddr2([c.ship_to_city, c.ship_to_state, c.ship_to_postal_code].filter(Boolean).join(', '))
+      setShipToCountry(c.ship_to_country || '')
+    }
   }
 
   function updateItem(idx, field, val) {
@@ -778,8 +803,17 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
 
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Valid Till</p>
-                  <input type="date" value={validTill} onChange={e => setValidTill(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input ref={validTillRef} type="date" value={validTill}
+                    onChange={e => setValidTill(e.target.value)} className="sr-only" tabIndex={-1} />
+                  <div
+                    onClick={() => { validTillRef.current?.showPicker?.() || validTillRef.current?.click() }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 cursor-pointer flex items-center justify-between hover:border-blue-400 transition"
+                  >
+                    {validTill ? formatDateDisplay(validTill) : <span className="text-gray-400">Select date…</span>}
+                    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
                 </div>
 
                 <div>
