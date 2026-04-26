@@ -132,6 +132,12 @@ alter table products_master add column if not exists product_code      text;
 alter table products_master add column if not exists pack_size         text;
 alter table products_master add column if not exists country_of_origin text;
 alter table products_master add column if not exists remarks           text;
+alter table products_master add column if not exists manufacturer        text;
+alter table products_master add column if not exists material_type       text;
+alter table products_master add column if not exists hsn_code            text;
+alter table products_master add column if not exists unit_of_measurement text;
+alter table products_master add column if not exists pack_dimension      text;
+alter table products_master add column if not exists pack_weight         text;
 
 -- Storage Master
 create table if not exists storage_master (
@@ -156,3 +162,43 @@ alter table storage_master   disable row level security;
 
 -- Optional: drop the old customers table after confirming you don't need its data
 -- drop table if exists customers;
+
+-- ============================================================
+-- Employee Activity Audit Log
+-- Run this in Supabase Dashboard → SQL Editor → New Query
+-- ============================================================
+create table if not exists audit_logs (
+  id           uuid primary key default gen_random_uuid(),
+  actor_name   text not null,
+  actor_role   text default 'employee',
+  company      text not null,
+  module       text not null,
+  action       text not null,
+  record_id    text,
+  record_label text,
+  details      jsonb default '{}',
+  created_at   timestamptz default now()
+);
+create index if not exists audit_logs_company_idx on audit_logs(company);
+create index if not exists audit_logs_actor_idx   on audit_logs(actor_name);
+create index if not exists audit_logs_created_idx on audit_logs(created_at desc);
+alter table audit_logs disable row level security;
+
+-- ============================================================
+-- Notifications
+-- ============================================================
+create table if not exists notifications (
+  id             uuid primary key default gen_random_uuid(),
+  recipient_name text not null,
+  message        text not null,
+  company        text,
+  is_read        boolean default false,
+  created_at     timestamptz default now()
+);
+create index if not exists notifications_recipient_idx on notifications(recipient_name);
+create index if not exists notifications_created_idx   on notifications(created_at desc);
+alter table notifications disable row level security;
+
+-- Enable realtime for notifications (required for live updates)
+-- Run separately if the above already exists:
+-- alter publication supabase_realtime add table notifications;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import jsPDF from 'jspdf'
 import { supabase } from './supabase'
+import { logActivity } from './auditLogger'
 
 // Canonical config keyed by the short token ("Inc" | "BV" | "India").
 // resolveCompany() maps whatever string App.jsx passes to the right token.
@@ -592,6 +593,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
         setToast({ type: 'warning', msg: 'PDF saved — could not save to database.' })
       } else {
         setToast({ type: 'success', msg: 'Estimate saved successfully.' })
+        logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'generated_estimate', details: { customer: billToName, inquiry_count: selectedInquiries.length } })
       }
       setTimeout(() => setToast(null), 4000)
     } finally {

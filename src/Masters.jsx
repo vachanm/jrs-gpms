@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from './supabase'
+import { logActivity } from './auditLogger'
 
 const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah']
 
@@ -1105,7 +1106,7 @@ function AttachmentsModal({ entityId, entityType, entityName, company, currentUs
   )
 }
 
-function CustomerSection({ company, showToast, isAdmin, currentUser }) {
+function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquiry }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
@@ -1207,6 +1208,7 @@ function CustomerSection({ company, showToast, isAdmin, currentUser }) {
       if (isAdmin) payload.pending_approval = false
       const { error } = await supabase.from('customers_master').update(payload).eq('id', editing.id)
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
+      logActivity({ actor: currentUser, company, module: 'Customer Master', action: 'edited', recordId: editing.id, recordLabel: form.name })
       showToast('Customer updated')
     } else {
       if (!payload.customer_code) payload.customer_code = await generateCustomerCode(form.country, company)
@@ -1227,6 +1229,9 @@ function CustomerSection({ company, showToast, isAdmin, currentUser }) {
             company,
           }))
         )
+        logActivity({ actor: currentUser, company, module: 'Customer Master', action: 'submitted_for_approval', recordLabel: form.name })
+      } else {
+        logActivity({ actor: currentUser, company, module: 'Customer Master', action: 'created', recordLabel: form.name })
       }
       showToast(sendForApproval ? 'Sent for approval' : 'Customer added')
     }
@@ -1234,7 +1239,9 @@ function CustomerSection({ company, showToast, isAdmin, currentUser }) {
   }
 
   async function handleDelete() {
-    await supabase.from('customers_master').delete().eq('id', confirmDelete.id)
+    const deleted = confirmDelete
+    await supabase.from('customers_master').delete().eq('id', deleted.id)
+    logActivity({ actor: currentUser, company, module: 'Customer Master', action: 'deleted', recordId: deleted.id, recordLabel: deleted.name })
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
@@ -1266,7 +1273,7 @@ function CustomerSection({ company, showToast, isAdmin, currentUser }) {
       {importFile && (
         <MasterImportModal file={importFile} tableKey="customers_master" company={company}
           onClose={() => setImportFile(null)}
-          onImported={count => { setImportFile(null); showToast(`${count} customer${count !== 1 ? 's' : ''} imported`); fetchEntries() }} />
+          onImported={count => { setImportFile(null); showToast(`${count} customer${count !== 1 ? 's' : ''} imported`); logActivity({ actor: currentUser, company, module: 'Customer Master', action: 'imported', details: { count } }); fetchEntries() }} />
       )}
       {confirmDelete && (
         <DeleteModal
@@ -1458,22 +1465,31 @@ function CustomerSection({ company, showToast, isAdmin, currentUser }) {
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-blue-50"
                         style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                        <button onClick={() => setAttachmentEntry(entry)}
-                          className="flex items-center gap-1 text-gray-500 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                          Files
-                        </button>
-                        <button onClick={() => openEdit(entry)}
-                          className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          Edit
-                        </button>
-                        <button onClick={() => setConfirmDelete(entry)}
-                          className="flex items-center gap-1 text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          Delete
-                        </button>
+                      <div className="flex items-center gap-1">
+                        {onAddInquiry && (
+                          <button onClick={() => onAddInquiry(entry.name)}
+                            className="flex items-center gap-1 text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg text-xs font-medium transition">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                            Inquiry
+                          </button>
+                        )}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <button onClick={() => setAttachmentEntry(entry)}
+                            className="flex items-center gap-1 text-gray-500 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                            Files
+                          </button>
+                          <button onClick={() => openEdit(entry)}
+                            className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            Edit
+                          </button>
+                          <button onClick={() => setConfirmDelete(entry)}
+                            className="flex items-center gap-1 text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -1891,18 +1907,22 @@ function SupplierSection({ company, showToast, currentUser }) {
     if (editing) {
       const { error } = await supabase.from('vendors_master').update(payload).eq('id', editing.id)
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
+      logActivity({ actor: currentUser, company, module: 'Vendors Master', action: 'edited', recordId: editing.id, recordLabel: form.name })
       showToast('Supplier updated')
     } else {
       if (!payload.supplier_code) payload.supplier_code = await generateSupplierCode(form.country, company)
       const { error } = await supabase.from('vendors_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
+      logActivity({ actor: currentUser, company, module: 'Vendors Master', action: 'created', recordLabel: form.name })
       showToast('Supplier added')
     }
     setSaving(false); closeForm(); fetchEntries()
   }
 
   async function handleDelete() {
-    await supabase.from('vendors_master').delete().eq('id', confirmDelete.id)
+    const deleted = confirmDelete
+    await supabase.from('vendors_master').delete().eq('id', deleted.id)
+    logActivity({ actor: currentUser, company, module: 'Vendors Master', action: 'deleted', recordId: deleted.id, recordLabel: deleted.name })
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
@@ -2315,7 +2335,7 @@ const PRODUCT_REPORT_COLS = [
   { label: 'Remarks',       key: 'remarks' },
 ]
 
-function ProductSection({ company, showToast }) {
+function ProductSection({ company, showToast, currentUser }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
@@ -2383,18 +2403,22 @@ function ProductSection({ company, showToast }) {
     if (editing) {
       const { error } = await supabase.from('products_master').update(payload).eq('id', editing.id)
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
+      logActivity({ actor: currentUser, company, module: 'Products Master', action: 'edited', recordId: editing.id, recordLabel: form.name })
       showToast('Product updated')
     } else {
       if (!payload.product_code) payload.product_code = await generateProductCode(form.country_of_origin, form.material_type, company)
       const { error } = await supabase.from('products_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
+      logActivity({ actor: currentUser, company, module: 'Products Master', action: 'created', recordLabel: form.name })
       showToast('Product added')
     }
     setSaving(false); closeForm(); fetchEntries()
   }
 
   async function handleDelete() {
-    await supabase.from('products_master').delete().eq('id', confirmDelete.id)
+    const deleted = confirmDelete
+    await supabase.from('products_master').delete().eq('id', deleted.id)
+    logActivity({ actor: currentUser, company, module: 'Products Master', action: 'deleted', recordId: deleted.id, recordLabel: deleted.name })
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
@@ -2677,7 +2701,7 @@ function ProductSection({ company, showToast }) {
 }
 
 // ── Generic Master Section (vendors / products / storage) ─────────────────────
-function MasterSection({ masterKey, company, showToast }) {
+function MasterSection({ masterKey, company, showToast, currentUser }) {
   const cfg = MASTERS[masterKey]
   const [entries, setEntries]     = useState([])
   const [loading, setLoading]     = useState(true)
@@ -2741,16 +2765,20 @@ function MasterSection({ masterKey, company, showToast }) {
     const payload = { ...form, company }
     if (editing) {
       await supabase.from(cfg.table).update(payload).eq('id', editing.id)
+      logActivity({ actor: currentUser, company, module: cfg.label, action: 'edited', recordId: editing.id, recordLabel: form.name })
       showToast(`${cfg.label.split(' ')[0]} updated`)
     } else {
       await supabase.from(cfg.table).insert([payload])
+      logActivity({ actor: currentUser, company, module: cfg.label, action: 'created', recordLabel: form.name })
       showToast(`${cfg.label.split(' ')[0]} added`)
     }
     setSaving(false); closeForm(); fetchEntries()
   }
 
   async function handleDelete() {
-    await supabase.from(cfg.table).delete().eq('id', confirmDelete.id)
+    const deleted = confirmDelete
+    await supabase.from(cfg.table).delete().eq('id', deleted.id)
+    logActivity({ actor: currentUser, company, module: cfg.label, action: 'deleted', recordId: deleted.id, recordLabel: deleted.name })
     setConfirmDelete(null); showToast('Entry deleted'); fetchEntries()
   }
 
@@ -3276,7 +3304,7 @@ function MasterReportModal({ title, rows, columns, company, onClose }) {
 }
 
 // ── Main Masters Component ────────────────────────────────────────────────────
-export default function Masters({ company, currentUser, isAdmin }) {
+export default function Masters({ company, currentUser, isAdmin, onAddInquiry }) {
   const [activeTab, setActiveTab] = useState('customers')
   const [toast, setToast]         = useState(null)
 
@@ -3312,12 +3340,12 @@ export default function Masters({ company, currentUser, isAdmin }) {
         {activeTab === 'company'
           ? <CompanyMaster key="company" showToast={showToast} />
           : activeTab === 'customers'
-            ? <CustomerSection key="customers" company={company} showToast={showToast} currentUser={currentUser} isAdmin={isAdmin} />
+            ? <CustomerSection key="customers" company={company} showToast={showToast} currentUser={currentUser} isAdmin={isAdmin} onAddInquiry={onAddInquiry} />
             : activeTab === 'vendors'
               ? <SupplierSection key="vendors" company={company} showToast={showToast} currentUser={currentUser} />
               : activeTab === 'products'
-                ? <ProductSection key="products" company={company} showToast={showToast} />
-                : <MasterSection key={activeTab} masterKey={activeTab} company={company} showToast={showToast} />
+                ? <ProductSection key="products" company={company} showToast={showToast} currentUser={currentUser} />
+                : <MasterSection key={activeTab} masterKey={activeTab} company={company} showToast={showToast} currentUser={currentUser} />
         }
 
       </div>

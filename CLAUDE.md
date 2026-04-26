@@ -21,53 +21,80 @@ No test suite is configured.
 ### Key Source Files
 
 - `src/main.jsx` — Entry point; mounts `<App>` into `#root`.
-- `src/App.jsx` — Application shell. Owns auth state (`currentUser`, `company`), navigation state (`activePage`), session persistence via `localStorage`, and renders all top-level UI: `LoginPage`, `Dashboard`, navbar, company switcher, profile/password modals, and the animated particle canvas on login.
-- `src/Inquiries.jsx` — RFQ/inquiry management (~1,700 lines). Full CRUD, inline status editing via portal dropdown, bulk selection, Excel/CSV import with auto-column detection, PDF/Excel export, and 6 report types.
-- `src/Masters.jsx` — Master data management. Tabbed CRUD for four masters (customers, vendors, products, storage locations) via a generic reusable `MasterSection` component.
-- `src/CRM.jsx` — Alternative customer management (~800 lines). CRUD with bulk Excel/CSV import (column mapping wizard), stat cards, status/search filtering.
+- `src/App.jsx` (~1,288 lines) — Application shell. Owns auth state (`currentUser`, `selectedCompany`), navigation (`activePage`), theme toggle, per-user notifications (realtime via Supabase channel), admin pending-approval badge, and auto-logout after 10 minutes of inactivity. Contains `LoginPage`, the `Dashboard` layout wrapper (sidebar + topbar), and all modal overlays. Session is persisted in `localStorage` under `jrs_user`, `jrs_company`, `jrs_theme`.
+- `src/Dashboard.jsx` (~508 lines) — Landing page after login. Shows summary stat cards (fetches from multiple tables) and a personal task widget whose data is stored in `localStorage` keyed by `jrs_tasks_<userId>` (not in Supabase).
+- `src/Inquiries.jsx` (~1,805 lines) — RFQ/inquiry management. Full CRUD, inline status editing via portal dropdown, bulk selection, Excel/CSV import with auto-column detection, PDF/Excel export, and report generation.
+- `src/Masters.jsx` (~3,326 lines) — Master data management. Tabbed CRUD for customers, vendors, products, and storage locations via a generic `MasterSection` component. Non-admin users submit new customers as `pending_approval=true`; admins approve/reject via `Admin.jsx`.
+- `src/Admin.jsx` (~271 lines) — Admin-only module. Lists `customers_master` rows with `pending_approval=true` and lets admins approve or reject them (sets `is_approved`, clears `pending_approval`, writes a `notifications` row for the submitter).
+- `src/Estimates.jsx` (~335 lines) — Estimate/quote list view under the ERP sub-nav. CRUD + PDF download.
+- `src/EstimateModal.jsx` (~994 lines) — Estimate create/edit form and PDF generator (`generateEstimatePDF`). Contains `COMPANY_CONFIG` with company-specific bank details and addresses for Inc / BV / India.
+- `src/CRM.jsx` (~798 lines) — Customer relationship management. Present in the codebase but **not wired into the current navigation**; `activePage` never resolves to `'crm'`.
 - `src/supabase.js` — Supabase client singleton (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
 
 ### Navigation Flow
 
-`App.jsx` conditionally renders pages based on `activePage` string state: `'dashboard'` | `'inquiries'` | `'masters'` | `'crm'` | `'erp'` | `'wms'`. ERP and WMS are placeholders. No React Router is wired up.
+`App.jsx` renders pages conditionally on `activePage` string state. Active values:
 
-### Authentication
+| `activePage` | Component rendered |
+|---|---|
+| `'dashboard'` | `DashboardPage` |
+| `'inquiries'` | `Inquiries` |
+| `'masters'` | `Masters` |
+| `'admin'` | `AdminModule` (only if `isAdmin`) |
+| `'erp-estimates'` | `Estimates` |
+| `'wms'` | Placeholder UI |
 
-`LoginPage` fetches all rows from `users`, lets the user pick a company (hard-coded list: Inc / BV / India), select an account, and enter a password. Auth is a direct Supabase query matching `name` + `password` (stored plaintext). On success, `currentUser` and `company` are written to `localStorage` and restored on App mount.
+No React Router is wired up. The ERP sub-nav in the sidebar is a collapsible group; `erp-estimates` is currently the only ERP child.
+
+### Authentication & Authorization
+
+`LoginPage` fetches all rows from `users`, lets the user pick a company (hard-coded list in `COMPANIES` array: `Jupiter Research Services Inc/BV/India`), select an account, and enter a password. Auth is a direct Supabase query matching `name` + `password` (stored plaintext).
+
+Admin access is gated by a hard-coded `ADMIN_USERS` array in `App.jsx`:
+```js
+const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah']
+```
+`isAdmin` is derived from `ADMIN_USERS.includes(currentUser?.name)` and controls rendering of the Admin nav item, the pending-approval badge, and the `AdminModule`.
 
 ### Supabase Tables
 
-All tables have RLS **disabled** — multi-tenancy is enforced in application code via `.eq('company', company)` on every query.
+All tables have RLS **disabled** — multi-tenancy is enforced in application code via `.eq('company', company)` on every query. The full schema (with `ALTER TABLE` migration statements for columns added after initial creation) is in `database_setup.sql`.
 
-| Table | Key Columns |
-|-------|-------------|
+| Table | Notable Columns |
+|-------|----------------|
 | `users` | `id`, `name`, `role`, `password` (plaintext) |
-| `inquiries` | `id`, `customer`, `account_manager`, `status`, `date_added`, `sourcing_country`, `product`, `ndc_ma_code`, `manufacturer`, `quantity`, `currency`, `quote_price`, `purchase_price`, `supplier`, `company`, `created_at` |
-| `customers_master` | `id`, `name`, `company`, `created_at` |
-| `vendors_master` | `id`, `name`, `company`, `created_at` |
-| `products_master` | `id`, `name`, `ndc_ma_code`, `manufacturer`, `company`, `created_at` |
-| `storage_master` | `id`, `name`, `location`, `company`, `created_at` |
-
-`database_setup.sql` at the project root contains the full schema with indexes.
+| `inquiries` | `customer`, `account_manager`, `status`, `date_added`, `sourcing_country`, `product`, `ndc_ma_code`, `manufacturer`, `quantity`, `currency`, `quote_price`, `purchase_price`, `supplier`, `company` |
+| `customers_master` | `name`, `customer_code`, `bill_to_*`, `ship_to_*`, `contact[1-3]_*`, `is_approved`, `pending_approval`, `submitted_by`, `company` |
+| `vendors_master` | `name`, `address1/2`, `contact[1-3]_*`, `approved_date`, `valid_through`, `license_number`, `company` |
+| `products_master` | `name`, `product_code`, `pack_size`, `ndc_ma_code`, `country_of_origin`, `company` |
+| `storage_master` | `name`, `location`, `company` |
+| `estimates` | Estimate/quote records used by `Estimates.jsx` and `EstimateModal.jsx` |
+| `notifications` | `recipient_name`, `is_read`, `created_at` — written by Admin approve/reject; read with realtime subscription in `App.jsx` |
+| `attachments` | File attachments (referenced in source, schema not in `database_setup.sql`) |
+| `company_master` | Company-level settings (referenced in source) |
+| `feedback` | Feedback records (referenced in source) |
 
 ### State Management Patterns
 
-No context providers or external state libraries. All state is local `useState` + prop drilling. Key patterns used throughout:
+No context providers or external state libraries. All state is local `useState` + prop drilling. Key patterns:
 
 - `useEffect` with `[company]` dependency to refetch data on company switch
-- `useEffect` with `document.addEventListener('mousedown', ...)` for click-outside-to-close dropdowns (always cleaned up in return)
-- `useEffect` with `window.addEventListener('keydown', ...)` for Escape-to-close modals
+- `useEffect` + `document.addEventListener('mousedown', ...)` for click-outside-to-close dropdowns (always cleaned up in return)
+- `useEffect` + `window.addEventListener('keydown', ...)` for Escape-to-close modals
 - `useMemo` for derived values (e.g., live margin calculation in Inquiries)
 - `useRef` for DOM targeting (portal positioning, focus management)
+- Portal dropdowns (`createPortal` into `document.body`) for status pickers that need to escape overflow-hidden containers
 
 ### Import/Export Dependencies
 
 - `xlsx` — Excel/CSV parsing (import) and workbook generation (export)
-- `jspdf` + `jspdf-autotable` — PDF report generation
+- `jspdf` + `jspdf-autotable` — PDF report generation (estimates and inquiry reports)
 
 ### Styling
 
-Tailwind CSS v4 via `@tailwindcss/vite` — no `tailwind.config.js`. All styles are inline Tailwind classes. Dynamic values use inline `style={}`. Design language: dark navy/blue gradients (`#0a1628`, `#0f1f3d`) for the shell, light `#f1f5f9` content area, glass-morphism cards with backdrop blur. Icons are inline SVG, not from lucide-react (which is installed but unused).
+Tailwind CSS v4 via `@tailwindcss/vite` — no `tailwind.config.js`. All styles are inline Tailwind classes. Dynamic values use inline `style={}`. Design language: dark navy/blue gradients (`#0a1628`, `#0f1f3d`) for the shell, light `#f1f5f9` content area, glass-morphism cards with `backdrop-blur`. Icons are inline SVG — `lucide-react` is installed but unused.
+
+Light/dark theme is toggled at the `Dashboard` wrapper level via `theme` prop; individual page components receive `theme` and apply conditional class names.
 
 ### Environment Variables
 

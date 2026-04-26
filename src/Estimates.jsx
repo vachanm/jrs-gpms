@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from './supabase'
+import { logActivity } from './auditLogger'
 import { generateEstimatePDF } from './EstimateModal'
 
 const STATUS_OPTIONS = ['Draft', 'Sent', 'Accepted', 'Rejected']
@@ -97,6 +98,7 @@ export default function Estimates({ company, currentUser }) {
     setOpenStatusId(null)
     setEstimates(prev => prev.map(e => e.id === id ? { ...e, status: newStatus } : e))
     await supabase.from('estimates').update({ status: newStatus }).eq('id', id)
+    logActivity({ actor: currentUser, company, module: 'Estimates', action: 'status_changed', recordId: id, details: { to: newStatus } })
   }
 
   async function handleDelete(id) {
@@ -105,6 +107,7 @@ export default function Estimates({ company, currentUser }) {
     await supabase.from('estimates').delete().eq('id', id)
     setEstimates(prev => prev.filter(e => e.id !== id))
     setDeletingId(null)
+    logActivity({ actor: currentUser, company, module: 'Estimates', action: 'deleted', recordId: id })
   }
 
   const filtered = applySortRows(

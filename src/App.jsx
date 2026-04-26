@@ -76,14 +76,38 @@ function App() {
 
   const isLoggedIn = !!(currentUser && selectedCompany)
 
-  function handleLogin(user, company) {
+  async function handleLogin(user, company) {
     localStorage.setItem('jrs_user',    JSON.stringify(user))
     localStorage.setItem('jrs_company', JSON.stringify(company))
     setCurrentUser(user)
     setSelectedCompany(company)
+    if (!ADMIN_USERS.includes(user.name)) {
+      try {
+        await supabase.from('audit_logs').insert([{
+          actor_name: user.name,
+          actor_role: user.role || 'employee',
+          company,
+          module: 'Session',
+          action: 'login',
+          details: { company },
+        }])
+      } catch { void 0 }
+    }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    if (currentUser && !ADMIN_USERS.includes(currentUser.name)) {
+      try {
+        await supabase.from('audit_logs').insert([{
+          actor_name: currentUser.name,
+          actor_role: currentUser.role || 'employee',
+          company: selectedCompany,
+          module: 'Session',
+          action: 'logout',
+          details: {},
+        }])
+      } catch { void 0 }
+    }
     localStorage.removeItem('jrs_user')
     localStorage.removeItem('jrs_company')
     setCurrentUser(null)
@@ -781,6 +805,7 @@ function MyProfileModal({ currentUser, selectedCompany, onClose, onNameUpdate })
 
 function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, selectedCompany, onCompanyChange, onLogout, onChangePassword, theme, toggleTheme, isAdmin, pendingCount, notifications, unreadCount, onMarkAllRead, onMarkOneRead }) {
   const [collapsed, setCollapsed]             = useState(false)
+  const [inquiryPrefill, setInquiryPrefill]   = useState(null)
   const [showProfile, setShowProfile]         = useState(false)
   const [showUserMenu, setShowUserMenu]       = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -1170,9 +1195,9 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
       {/* ── Main content ── */}
       <main style={{ flex: 1, overflowY: 'auto', background: theme === 'dark' ? '#070e1b' : '#f1f5f9', display: 'flex', flexDirection: 'column' }}>
         {activePage === 'dashboard'     && <DashboardPage currentUser={currentUser} company={selectedCompany} setActivePage={setActivePage} />}
-        {activePage === 'inquiries'     && <Inquiries company={selectedCompany} currentUser={currentUser} />}
-        {activePage === 'masters'       && <Masters company={selectedCompany} currentUser={currentUser} isAdmin={isAdmin} />}
-        {activePage === 'admin'         && isAdmin && <AdminModule company={selectedCompany} />}
+        {activePage === 'inquiries'     && <Inquiries company={selectedCompany} currentUser={currentUser} prefillCustomer={inquiryPrefill} onClearPrefill={() => setInquiryPrefill(null)} />}
+        {activePage === 'masters'       && <Masters company={selectedCompany} currentUser={currentUser} isAdmin={isAdmin} onAddInquiry={(customerName) => { setInquiryPrefill({ customer: customerName }); setActivePage('inquiries') }} />}
+        {activePage === 'admin'         && isAdmin && <AdminModule company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'erp-estimates' && <Estimates company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'wms' && (
           <div style={{ padding: 32 }}>

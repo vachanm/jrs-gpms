@@ -5,11 +5,52 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from './supabase'
 import EstimateModal from './EstimateModal'
+import { logActivity } from './auditLogger'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STATUSES   = ['Active', 'Inactive', 'Lead', 'Prospect']
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'INR']
 const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£', INR: '₹' }
+
+const PRODUCT_COUNTRIES = [
+  'Afghanistan','Albania','Algeria','Argentina','Australia','Austria',
+  'Bangladesh','Belgium','Brazil','Canada','Chile','China','Colombia',
+  'Croatia','Czech Republic','Denmark','Egypt','Ethiopia','Finland',
+  'France','Germany','Ghana','Greece','Hungary','India','Indonesia',
+  'Iran','Iraq','Ireland','Israel','Italy','Japan','Jordan','Kenya',
+  'Malaysia','Mexico','Morocco','Netherlands','New Zealand','Nigeria',
+  'Norway','Pakistan','Philippines','Poland','Portugal','Romania',
+  'Russia','Saudi Arabia','Singapore','South Africa','South Korea',
+  'Spain','Sri Lanka','Sweden','Switzerland','Taiwan','Thailand',
+  'Turkey','Ukraine','United Arab Emirates','United Kingdom',
+  'United States','Vietnam',
+]
+
+const MATERIAL_TYPES = [
+  { label: 'Product',                 code: 'PR' },
+  { label: 'Equipment',               code: 'EQ' },
+  { label: 'Ancillary',               code: 'AN' },
+  { label: 'Labels',                  code: 'LB' },
+  { label: 'Bulk',                    code: 'BK' },
+  { label: 'Services',                code: 'SR' },
+  { label: 'Package',                 code: 'PK' },
+  { label: 'Cartons',                 code: 'CT' },
+  { label: 'Logistics',               code: 'LG' },
+  { label: 'Asset',                   code: 'AS' },
+  { label: 'Warehouse',               code: 'WH' },
+  { label: 'Clinical Trial Material', code: 'TM' },
+]
+
+const UNITS_OF_MEASUREMENT = [
+  { label: 'Each',             code: 'each' },
+  { label: 'Syringe',         code: 'Syr'  },
+  { label: 'Ampoules',        code: 'amps' },
+  { label: 'Vials',           code: 'vial' },
+  { label: 'Prefilled Syringe', code: 'PFS' },
+  { label: 'Prefilled PEN',   code: 'PFP'  },
+  { label: 'Cartridge',       code: 'Cart' },
+  { label: 'Packs',           code: 'pack' },
+]
 
 const EMPTY_FORM = {
   customer: '', account_manager: '', status: 'Lead',
@@ -312,10 +353,13 @@ function MasterSelect({ value, onChange, options, placeholder, err }) {
 
 // ── Quick Add Modal (add to master tables on the fly) ─────────────────────────
 function QuickAddModal({ type, company, onSave, onClose }) {
-  const [name, setName]         = useState('')
-  const [ndcCode, setNdcCode]   = useState('')
-  const [mfr, setMfr]           = useState('')
-  const [saving, setSaving]     = useState(false)
+  const [form, setForm] = useState({
+    name: '', manufacturer: '', material_type: '', country_of_origin: '',
+    ndc_ma_code: '', hsn_code: '', unit_of_measurement: '',
+    pack_size: '', pack_dimension: '', pack_weight: '', remarks: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
   const config = {
     customer: { table: 'customers_master', label: 'Customer', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> },
@@ -329,14 +373,21 @@ function QuickAddModal({ type, company, onSave, onClose }) {
   }, [onClose])
 
   async function save() {
-    if (!name.trim()) return
+    if (!form.name.trim()) return
     setSaving(true)
-    const row = { name: name.trim(), company }
+    const row = { ...form, name: form.name.trim(), company }
     if (type === 'product') {
-      row.ndc_ma_code = ndcCode.trim(); row.manufacturer = mfr.trim()
+      const mt = MATERIAL_TYPES.find(m => m.label === form.material_type)
+      const mtCode = mt ? mt.code : 'PR'
+      const coCode = form.country_of_origin ? form.country_of_origin.slice(0, 2).toUpperCase() : 'XX'
       const { data: existing } = await supabase.from('products_master').select('product_code').eq('company', company)
-      const nums = (existing || []).map(r => r.product_code).filter(c => c && /^PRD-\d+$/.test(c)).map(c => parseInt(c.replace('PRD-', ''), 10))
-      row.product_code = `PRD-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
+      const prefix = `${mtCode}-${coCode}-`
+      const nums = (existing || [])
+        .map(r => r.product_code)
+        .filter(c => c && c.startsWith(prefix))
+        .map(c => parseInt(c.replace(prefix, ''), 10))
+        .filter(n => !isNaN(n))
+      row.product_code = `${prefix}${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
     }
     if (type === 'customer') {
       const { data: existing } = await supabase.from('customers_master').select('customer_code').eq('company', company)
@@ -344,41 +395,103 @@ function QuickAddModal({ type, company, onSave, onClose }) {
       row.customer_code = `CUS-${String(nums.length > 0 ? Math.max(...nums) + 1 : 1).padStart(3, '0')}`
       row.is_approved = false
     }
-    const { data } = await supabase.from(config.table).insert([row]).select().single()
+    const { data, error } = await supabase.from(config.table).insert([row]).select().single()
     setSaving(false)
+    if (error) { alert(`Failed to save: ${error.message}`); return }
     onSave(data)
   }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
-          <h3 className="font-bold text-gray-900 text-base flex items-center gap-1.5">{config.icon}<span>Add New {config.label}</span></h3>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h3 className="font-bold text-gray-900 text-base flex items-center gap-1.5">{config.icon}<span>Add New {config.label}</span></h3>
+            {type === 'product' && <p className="text-xs text-gray-400 mt-0.5">Saved to Product Master automatically</p>}
+          </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="px-5 py-4 space-y-3">
-          <Field label={`${config.label} Name *`}>
-            <input autoFocus className={inputCls(false)} value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && save()}
-              placeholder={`Enter ${config.label.toLowerCase()} name`} />
-          </Field>
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+          {/* Row 1: Name + Code */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <Field label={`${config.label} Name *`}>
+                <input autoFocus className={inputCls(false)} value={form.name}
+                  onChange={set('name')}
+                  onKeyDown={e => { if (e.key === 'Enter' && type !== 'product') save() }}
+                  placeholder={`Enter ${config.label.toLowerCase()} name`} />
+              </Field>
+            </div>
+            {type === 'product' && (
+              <Field label="Product Code">
+                <input className={`${inputCls(false)} bg-gray-50 text-gray-400 font-mono text-xs`}
+                  value="Auto-generated" readOnly disabled />
+              </Field>
+            )}
+          </div>
           {type === 'product' && (
             <>
-              <Field label="NDC / MA Code">
-                <input className={inputCls(false)} value={ndcCode} onChange={e => setNdcCode(e.target.value)} placeholder="Optional" />
-              </Field>
-              <Field label="Manufacturer">
-                <input className={inputCls(false)} value={mfr} onChange={e => setMfr(e.target.value)} placeholder="Optional" />
+              {/* Row 2: Manufacturer + Material Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Manufacturer">
+                  <input className={inputCls(false)} value={form.manufacturer} onChange={set('manufacturer')} placeholder="e.g. Bayer AG" />
+                </Field>
+                <Field label="Material Type">
+                  <select className={inputCls(false)} value={form.material_type} onChange={set('material_type')}>
+                    <option value="">Select type…</option>
+                    {MATERIAL_TYPES.map(m => <option key={m.code} value={m.label}>{m.label} ({m.code})</option>)}
+                  </select>
+                </Field>
+              </div>
+              {/* Row 3: Country + NDC */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Country of Origin">
+                  <select className={inputCls(false)} value={form.country_of_origin} onChange={set('country_of_origin')}>
+                    <option value="">Select country…</option>
+                    {PRODUCT_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </Field>
+                <Field label="NDC / MA Product Code">
+                  <input className={inputCls(false)} value={form.ndc_ma_code} onChange={set('ndc_ma_code')} placeholder="e.g. NDC 12345-678" />
+                </Field>
+              </div>
+              {/* Row 4: HSN + UOM */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="HSN Code">
+                  <input className={inputCls(false)} value={form.hsn_code} onChange={set('hsn_code')} placeholder="e.g. 30049099" />
+                </Field>
+                <Field label="Unit of Measurement">
+                  <select className={inputCls(false)} value={form.unit_of_measurement} onChange={set('unit_of_measurement')}>
+                    <option value="">Select unit…</option>
+                    {UNITS_OF_MEASUREMENT.map(u => <option key={u.code} value={u.code}>{u.label} ({u.code})</option>)}
+                  </select>
+                </Field>
+              </div>
+              {/* Row 5: Pack Size + Dimension + Weight */}
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Pack Size">
+                  <input className={inputCls(false)} value={form.pack_size} onChange={set('pack_size')} placeholder="e.g. 10×10 blister" />
+                </Field>
+                <Field label="Pack Dimension">
+                  <input className={inputCls(false)} value={form.pack_dimension} onChange={set('pack_dimension')} placeholder="e.g. 100×50×30 mm" />
+                </Field>
+                <Field label="Pack Weight">
+                  <input className={inputCls(false)} value={form.pack_weight} onChange={set('pack_weight')} placeholder="e.g. 250g" />
+                </Field>
+              </div>
+              {/* Row 6: Remarks */}
+              <Field label="Remarks">
+                <textarea className={`${inputCls(false)} resize-none`} rows={2}
+                  value={form.remarks} onChange={set('remarks')} placeholder="Any additional notes…" />
               </Field>
             </>
           )}
         </div>
-        <div className="flex gap-3 px-5 pb-5">
+        <div className="flex gap-3 px-5 pb-5 pt-3 border-t border-gray-100 shrink-0">
           <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
-          <button onClick={save} disabled={saving || !name.trim()}
+          <button onClick={save} disabled={saving || !form.name.trim()}
             className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2">
             {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
             {saving ? 'Saving…' : 'Save & Select'}
@@ -755,7 +868,7 @@ function StatusPortalDropdown({ pos, currentStatus, onPick, onClose }) {
 }
 
 // ── Inline status badge with portal dropdown ──────────────────────────────────
-function InlineStatusBadge({ inq, onStatusChange }) {
+function InlineStatusBadge({ inq, onStatusChange, currentUser, company }) {
   const [open, setOpen]     = useState(false)
   const [pos, setPos]       = useState({ top: 0, left: 0 })
   const [saving, setSaving] = useState(false)
@@ -775,12 +888,14 @@ function InlineStatusBadge({ inq, onStatusChange }) {
   async function handlePick(status) {
     setOpen(false)
     if (status === inq.status) return
+    const oldStatus = inq.status
     setSaving(true)
     await supabase.from('inquiries').update({ status }).eq('id', inq.id)
     setSaving(false)
     setFlash(true)
     setTimeout(() => setFlash(false), 1200)
     onStatusChange(inq.id, status)
+    logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'status_changed', recordId: inq.id, recordLabel: inq.customer, details: { from: oldStatus, to: status } })
   }
 
   return (
@@ -1009,7 +1124,7 @@ function ReportModal({ inquiries, company, masterCustomers, masterProducts, user
 }
 
 // ── Main Inquiries Component ──────────────────────────────────────────────────
-export default function Inquiries({ company, currentUser }) {
+export default function Inquiries({ company, currentUser, prefillCustomer, onClearPrefill }) {
   const [inquiries, setInquiries]   = useState([])
   const [loading, setLoading]       = useState(true)
   const [showForm, setShowForm]     = useState(false)
@@ -1073,6 +1188,15 @@ export default function Inquiries({ company, currentUser }) {
     setEditing(null); setForm({ ...EMPTY_FORM, date_added: new Date().toISOString().split('T')[0] }); setErrors({}); setShowForm(true)
   }
 
+  useEffect(() => {
+    if (!prefillCustomer?.customer) return
+    setEditing(null)
+    setForm({ ...EMPTY_FORM, customer: prefillCustomer.customer, date_added: new Date().toISOString().split('T')[0] })
+    setErrors({})
+    setShowForm(true)
+    onClearPrefill()
+  }, [prefillCustomer])
+
   function openEdit(inq) {
     setEditing(inq)
     setForm({
@@ -1130,6 +1254,11 @@ export default function Inquiries({ company, currentUser }) {
       showToast(opError.message || 'Save failed — check Supabase table/RLS settings', 'error')
       return
     }
+    if (editing) {
+      logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'edited', recordId: editing.id, recordLabel: form.customer, details: { fields_changed: Object.keys(form).filter(k => String(form[k]) !== String(editing[k])) } })
+    } else {
+      logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'created', recordLabel: form.customer, details: { product: form.product, status: payload.status } })
+    }
     showToast(editing ? 'Inquiry updated' : 'Inquiry added')
     closeForm()
     await fetchAll()
@@ -1137,16 +1266,19 @@ export default function Inquiries({ company, currentUser }) {
 
   async function handleDelete() {
     const { error } = await supabase.from('inquiries').delete().eq('id', confirmDelete.id)
+    if (error) { setConfirmDelete(null); showToast(error.message, 'error'); return }
+    logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'deleted', recordId: confirmDelete.id, recordLabel: confirmDelete.customer })
     setConfirmDelete(null)
-    if (error) { showToast(error.message, 'error'); return }
     showToast('Inquiry deleted')
     await fetchAll()
   }
 
   async function handleDeleteAll() {
     setShowDeleteAll(false)
+    const count = inquiries.length
     const { error } = await supabase.from('inquiries').delete().eq('company', company)
     if (error) { showToast(error.message, 'error'); return }
+    logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'deleted_all', details: { count } })
     showToast('All inquiries deleted')
     await fetchAll()
   }
@@ -1309,7 +1441,7 @@ export default function Inquiries({ company, currentUser }) {
 
       {importFile && (
         <ImportModal file={importFile} company={company} onClose={() => setImportFile(null)}
-          onImported={count => { setImportFile(null); showToast(`Imported ${count} inquiries`); fetchAll() }} />
+          onImported={count => { setImportFile(null); showToast(`Imported ${count} inquiries`); logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'imported', details: { count } }); fetchAll() }} />
       )}
 
       {quickAdd && (
@@ -1614,7 +1746,7 @@ export default function Inquiries({ company, currentUser }) {
                           className={`px-3 py-2 border-l border-gray-100 transition-colors ${selectedIds.has(inq.id) ? 'bg-blue-50' : 'bg-white group-hover:bg-blue-50'}`}
                           style={{ position: 'sticky', right: 130, zIndex: 20 }}
                         >
-                          <InlineStatusBadge inq={inq} onStatusChange={handleInlineStatusChange} />
+                          <InlineStatusBadge inq={inq} onStatusChange={handleInlineStatusChange} currentUser={currentUser} company={company} />
                         </td>
 
                         {/* ── Frozen Right: Actions cell ── */}
@@ -1704,8 +1836,23 @@ export default function Inquiries({ company, currentUser }) {
 
                 <div className="col-span-2">
                   <Field label="Sourcing Country">
-                    <input className={inputCls(false)} value={form.sourcing_country} placeholder="e.g. India, Germany…"
-                      onChange={e => setForm(f => ({ ...f, sourcing_country: e.target.value }))} />
+                    <select className={inputCls(false)} value={form.sourcing_country}
+                      onChange={e => setForm(f => ({ ...f, sourcing_country: e.target.value }))}>
+                      <option value="">Select country…</option>
+                      {[
+                        'Afghanistan','Albania','Algeria','Argentina','Australia','Austria','Bangladesh',
+                        'Belgium','Brazil','Bulgaria','Cambodia','Canada','Chile','China','Colombia',
+                        'Croatia','Czech Republic','Denmark','Egypt','Estonia','Ethiopia','Finland',
+                        'France','Germany','Ghana','Greece','Hungary','India','Indonesia','Iran','Iraq',
+                        'Ireland','Israel','Italy','Japan','Jordan','Kazakhstan','Kenya','Latvia',
+                        'Lithuania','Malaysia','Mexico','Morocco','Myanmar','Netherlands','New Zealand',
+                        'Nigeria','Norway','Pakistan','Peru','Philippines','Poland','Portugal','Romania',
+                        'Russia','Saudi Arabia','Serbia','Singapore','Slovakia','Slovenia','South Africa',
+                        'South Korea','Spain','Sri Lanka','Sweden','Switzerland','Taiwan','Thailand',
+                        'Turkey','Ukraine','United Arab Emirates','United Kingdom','United States',
+                        'Venezuela','Vietnam','Other',
+                      ].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
                   </Field>
                 </div>
 
@@ -1714,9 +1861,20 @@ export default function Inquiries({ company, currentUser }) {
 
                 <div className="col-span-2">
                   <Field label="Product">
-                    <MasterSelect value={form.product} err={false}
-                      onChange={handleProductChange}
-                      options={masterProducts} placeholder="Select product…" />
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <MasterSelect value={form.product} err={false}
+                          onChange={handleProductChange}
+                          options={masterProducts} placeholder="Select product…" />
+                      </div>
+                      <button type="button" onClick={() => setQuickAdd({ type: 'product' })}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 text-xs font-medium transition whitespace-nowrap">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add New
+                      </button>
+                    </div>
                   </Field>
                 </div>
 
