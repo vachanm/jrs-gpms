@@ -490,19 +490,22 @@ async function nextSeqNum(table, codeField, prefix, company) {
 }
 
 async function generateCustomerCode(country, company) {
-  const prefix = CUSTOMER_PREFIX[country] || 'CXX'
+  const { data } = await supabase.from('code_formats').select('prefix').eq('type', 'customer').eq('country', country).eq('company', company).maybeSingle()
+  const prefix = data?.prefix || CUSTOMER_PREFIX[country] || 'CXX'
   const seq = await nextSeqNum('customers_master', 'customer_code', prefix, company)
   return `${prefix} ${seq}`
 }
 
 async function generateSupplierCode(country, company) {
-  const prefix = SUPPLIER_PREFIX[country] || 'SXX'
+  const { data } = await supabase.from('code_formats').select('prefix').eq('type', 'supplier').eq('country', country).eq('company', company).maybeSingle()
+  const prefix = data?.prefix || SUPPLIER_PREFIX[country] || 'SXX'
   const seq = await nextSeqNum('vendors_master', 'supplier_code', prefix, company)
   return `${prefix} ${seq}`
 }
 
 async function generateProductCode(country, materialType, company) {
-  const iso = COUNTRY_ISO2[country] || 'XX'
+  const { data } = await supabase.from('code_formats').select('prefix').eq('type', 'product').eq('country', country).eq('company', company).maybeSingle()
+  const iso = data?.prefix || COUNTRY_ISO2[country] || 'XX'
   const mt = MATERIAL_TYPES.find(m => m.label === materialType)
   const typeCode = mt ? mt.code : 'PR'
   const prefix = `${iso}${typeCode}`
@@ -1106,6 +1109,194 @@ function AttachmentsModal({ entityId, entityType, entityName, company, currentUs
   )
 }
 
+// ── Code Format Section ───────────────────────────────────────────────────────
+const CODE_FORMAT_TABLE_CFG = {
+  customer: { table: 'customers_master', codeField: 'customer_code', countryField: 'country' },
+  supplier: { table: 'vendors_master',   codeField: 'supplier_code', countryField: 'country' },
+  product:  { table: 'products_master',  codeField: 'product_code',  countryField: 'country_of_origin' },
+}
+
+function CodeFormatSection({ type, company, showToast, onAfterSave }) {
+  const defaults = type === 'customer' ? CUSTOMER_PREFIX
+    : type === 'supplier' ? SUPPLIER_PREFIX
+    : COUNTRY_ISO2
+
+  const [customFormats, setCustomFormats] = useState([])
+  const [open, setOpen]       = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newCountry, setNewCountry] = useState('')
+  const [newPrefix, setNewPrefix]   = useState('')
+  const [saving, setSaving]   = useState(false)
+
+  useEffect(() => {
+    supabase.from('code_formats').select('*').eq('type', type).eq('company', company)
+      .then(({ data }) => setCustomFormats(data || []))
+  }, [type, company])
+
+  const customCountries  = new Set(customFormats.map(f => f.country))
+  const builtInCountries = new Set(Object.keys(defaults))
+  const availableCountries = COUNTRIES.filter(c => !builtInCountries.has(c) && !customCountries.has(c))
+
+  async function addFormat() {
+    if (!newCountry.trim() || !newPrefix.trim()) return
+    setSaving(true)
+    const prefix  = newPrefix.trim().toUpperCase()
+    const country = newCountry.trim()
+
+    const { data, error } = await supabase.from('code_formats')
+      .insert([{ type, country, prefix, company }])
+      .select().single()
+
+    if (error) { setSaving(false); showToast?.(error.message, 'error'); return }
+
+    // Auto-assign codes to existing entries from this country that have no code yet
+    const cfg = CODE_FORMAT_TABLE_CFG[type]
+    const fallbackPrefix = type === 'customer' ? 'CXX' : type === 'supplier' ? 'SXX' : 'XX'
+    const { data: countryEntries } = await supabase.from(cfg.table)
+      .select('id' + (type === 'product' ? ', material_type' : '') + `, ${cfg.codeField}`)
+      .eq(cfg.countryField, country).eq('company', company)
+    const needsCodes = (countryEntries || []).filter(e => {
+      const code = e[cfg.codeField]
+      return !code || code === '' || code.startsWith(fallbackPrefix)
+    })
+
+    let updated = 0
+    if (needsCodes?.length > 0) {
+      const { data: existingCodes } = await supabase.from(cfg.table)
+        .select(cfg.codeField).eq('company', company)
+      const pool = [...(existingCodes || [])]
+
+      for (const entry of needsCodes) {
+        const fullPrefix = type === 'product'
+          ? `${prefix}${MATERIAL_TYPES.find(m => m.label === entry.material_type)?.code || 'PR'}`
+          : prefix
+        const re  = new RegExp(`^${fullPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\d+)$`)
+        const nums = pool.map(r => r[cfg.codeField]).filter(Boolean)
+          .map(c => { const m = c.match(re); return m ? parseInt(m[1], 10) : null }).filter(n => n !== null)
+        const seq     = nums.length > 0 ? Math.max(...nums) + 1 : 10001
+        const newCode = `${fullPrefix} ${seq}`
+        await supabase.from(cfg.table).update({ [cfg.codeField]: newCode }).eq('id', entry.id)
+        pool.push({ [cfg.codeField]: newCode })
+        updated++
+      }
+    }
+
+    setSaving(false)
+    setCustomFormats(f => [...f, data])
+    setNewCountry(''); setNewPrefix(''); setShowAdd(false)
+    showToast?.(updated > 0
+      ? `Code format saved. ${updated} existing entr${updated !== 1 ? 'ies' : 'y'} updated.`
+      : 'Code format saved.', 'success')
+    if (updated > 0) onAfterSave?.()
+  }
+
+  async function deleteFormat(id) {
+    await supabase.from('code_formats').delete().eq('id', id)
+    setCustomFormats(f => f.filter(x => x.id !== id))
+  }
+
+  const title = type === 'customer' ? 'Customer Code Master'
+    : type === 'supplier' ? 'Supplier Code Master' : 'Product Code Master'
+  const prefixLabel = type === 'product' ? 'ISO2 Code' : 'Prefix'
+  const prefixHint  = type === 'product' ? '2-letter ISO (e.g. TR)' : '3-letter prefix (e.g. CTR)'
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-4 text-left">
+        <div className="flex items-center gap-3">
+          <svg className="w-5 h-5 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+          <span className="font-semibold text-gray-800 text-sm">{title}</span>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+            {Object.keys(defaults).length + customFormats.length} formats
+          </span>
+        </div>
+        <svg style={{ width: 14, height: 14, transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24" className="text-gray-400 shrink-0">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-6 pb-6 border-t border-gray-100">
+          <div className="flex justify-end pt-4 mb-4">
+            <button onClick={() => setShowAdd(v => !v)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Format
+            </button>
+          </div>
+
+          {showAdd && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4 flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[160px]">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Country</label>
+                <select value={newCountry} onChange={e => setNewCountry(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option value="">Select country…</option>
+                  {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="w-44">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">{prefixLabel}</label>
+                <input value={newPrefix} onChange={e => setNewPrefix(e.target.value)}
+                  placeholder={prefixHint}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyDown={e => e.key === 'Enter' && addFormat()} />
+              </div>
+              <button onClick={addFormat} disabled={saving || !newCountry || !newPrefix}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap">
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => { setShowAdd(false); setNewCountry(''); setNewPrefix('') }}
+                className="border border-gray-200 text-gray-600 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm transition">
+                Cancel
+              </button>
+            </div>
+          )}
+
+          <div className="overflow-x-auto rounded-xl border border-gray-100">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Country</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{prefixLabel}</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Source</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {customFormats.map(f => (
+                  <tr key={f.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-700">{f.country}</td>
+                    <td className="px-4 py-2.5 font-mono text-blue-600 font-medium">{f.prefix}</td>
+                    <td className="px-4 py-2.5"><span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">Custom</span></td>
+                    <td className="px-4 py-2.5 text-right">
+                      <button onClick={() => deleteFormat(f.id)} className="text-red-400 hover:text-red-600 text-xs transition">Remove</button>
+                    </td>
+                  </tr>
+                ))}
+                {Object.entries(defaults).map(([country, prefix]) => (
+                  <tr key={country} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-700">{country}</td>
+                    <td className="px-4 py-2.5 font-mono text-blue-600 font-medium">{prefix}</td>
+                    <td className="px-4 py-2.5"><span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Built-in</span></td>
+                    <td className="px-4 py-2.5" />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquiry }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
@@ -1423,12 +1614,12 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
           <div className="px-5 py-3 border-b border-gray-100">
             <p className="text-xs text-gray-400 font-medium">{filtered.length} of {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'}</p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 22rem)' }}>
             <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '1200px', width: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 cursor-pointer select-none hover:text-gray-700"
-                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                      style={{ position: 'sticky', top: 0, left: 0, zIndex: 30, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
                       onClick={() => toggleSort('name')}>
                     Customer Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
@@ -1446,16 +1637,17 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
                   ].map(({ label, field }) => (
                     <th key={label}
                       className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 ${field ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
+                      style={{ position: 'sticky', top: 0, zIndex: 10 }}
                       onClick={field ? () => toggleSort(field) : undefined}>
                       {label}{field && <SortIcon field={field} sortField={sortField} sortDir={sortDir} />}
                     </th>
                   ))}
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
-                      style={{ position: 'sticky', right: 140, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.04)' }}>
+                      style={{ position: 'sticky', top: 0, right: 140, zIndex: 30, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.04)' }}>
                     Status
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
-                      style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                      style={{ position: 'sticky', top: 0, right: 0, zIndex: 30, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                     Actions
                   </th>
                 </tr>
@@ -1463,8 +1655,8 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(entry => (
                   <tr key={entry.id} className="hover:bg-blue-50/30 transition group">
-                    <td className="px-5 py-3.5 bg-white group-hover:bg-blue-50"
-                        style={{ position: 'sticky', left: 0, zIndex: 1, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                    <td className="px-5 py-3.5"
+                        style={{ position: 'sticky', left: 0, zIndex: 20, background: 'white', boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
                           {entry.name?.charAt(0)?.toUpperCase() || '?'}
@@ -1496,8 +1688,8 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[160px]">
                       <RemarksCell text={entry.remarks} />
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-blue-50"
-                        style={{ position: 'sticky', right: 140, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.04)' }}>
+                    <td className="px-5 py-3.5 whitespace-nowrap"
+                        style={{ position: 'sticky', right: 140, zIndex: 20, background: 'white', boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.04)' }}>
                       {entry.pending_approval ? (
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border text-orange-700 bg-orange-50 border-orange-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
@@ -1524,8 +1716,8 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
                         )
                       )}
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-blue-50"
-                        style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                    <td className="px-5 py-3.5 whitespace-nowrap"
+                        style={{ position: 'sticky', right: 0, zIndex: 20, background: 'white', boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-1">
                         {onAddInquiry && (
                           <button onClick={() => onAddInquiry(entry.name)}
@@ -1851,6 +2043,7 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
           </div>
         </div>
       )}
+      <CodeFormatSection type="customer" company={company} showToast={showToast} onAfterSave={fetchEntries} />
     </div>
   )
 }
@@ -2091,12 +2284,12 @@ function SupplierSection({ company, showToast, currentUser }) {
           <div className="px-5 py-3 border-b border-gray-100">
             <p className="text-xs text-gray-400 font-medium">{filtered.length} of {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'}</p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 22rem)' }}>
             <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '1200px', width: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 cursor-pointer select-none"
-                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                      style={{ position: 'sticky', top: 0, left: 0, zIndex: 30, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
                       onClick={() => toggleSort('name')}>
                     Supplier Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
@@ -2122,12 +2315,13 @@ function SupplierSection({ company, showToast, currentUser }) {
                   ].map(({ label, field }) => (
                     <th key={label}
                         className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50${field ? ' cursor-pointer select-none' : ''}`}
+                        style={{ position: 'sticky', top: 0, zIndex: 10 }}
                         onClick={field ? () => toggleSort(field) : undefined}>
                       {label}{field && <SortIcon field={field} sortField={sortField} sortDir={sortDir} />}
                     </th>
                   ))}
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
-                      style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                      style={{ position: 'sticky', top: 0, right: 0, zIndex: 30, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                     Actions
                   </th>
                 </tr>
@@ -2135,8 +2329,8 @@ function SupplierSection({ company, showToast, currentUser }) {
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(entry => (
                   <tr key={entry.id} className="hover:bg-purple-50/30 transition group">
-                    <td className="px-5 py-3.5 bg-white group-hover:bg-purple-50/40"
-                        style={{ position: 'sticky', left: 0, zIndex: 1, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                    <td className="px-5 py-3.5"
+                        style={{ position: 'sticky', left: 0, zIndex: 20, background: 'white', boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
                           {entry.name?.charAt(0)?.toUpperCase() || '?'}
@@ -2178,8 +2372,8 @@ function SupplierSection({ company, showToast, currentUser }) {
                       <RemarksCell text={entry.remarks} />
                     </td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.created_at)}</td>
-                    <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-purple-50/40"
-                        style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                    <td className="px-5 py-3.5 whitespace-nowrap"
+                        style={{ position: 'sticky', right: 0, zIndex: 20, background: 'white', boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                         <button onClick={() => setAttachmentEntry(entry)}
                           className="flex items-center gap-1 text-gray-500 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
@@ -2375,6 +2569,7 @@ function SupplierSection({ company, showToast, currentUser }) {
           </div>
         </div>
       )}
+      <CodeFormatSection type="supplier" company={company} showToast={showToast} onAfterSave={fetchEntries} />
     </div>
   )
 }
@@ -2597,12 +2792,12 @@ function ProductSection({ company, showToast, currentUser }) {
           <div className="px-5 py-3 border-b border-gray-100">
             <p className="text-xs text-gray-400 font-medium">{filtered.length} of {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'}</p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 22rem)' }}>
             <table className="text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '900px', width: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 cursor-pointer select-none"
-                      style={{ position: 'sticky', left: 0, zIndex: 2, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
+                      style={{ position: 'sticky', top: 0, left: 0, zIndex: 30, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}
                       onClick={() => toggleSort('name')}>
                     Product Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
@@ -2619,12 +2814,13 @@ function ProductSection({ company, showToast, currentUser }) {
                   ].map(({ label, field }) => (
                     <th key={label}
                         className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50${field ? ' cursor-pointer select-none' : ''}`}
+                        style={{ position: 'sticky', top: 0, zIndex: 10 }}
                         onClick={field ? () => toggleSort(field) : undefined}>
                       {label}{field && <SortIcon field={field} sortField={sortField} sortDir={sortDir} />}
                     </th>
                   ))}
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
-                      style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                      style={{ position: 'sticky', top: 0, right: 0, zIndex: 30, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                     Actions
                   </th>
                 </tr>
@@ -2632,8 +2828,8 @@ function ProductSection({ company, showToast, currentUser }) {
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(entry => (
                   <tr key={entry.id} className="hover:bg-emerald-50/30 transition group">
-                    <td className="px-5 py-3.5 bg-white group-hover:bg-emerald-50/40"
-                        style={{ position: 'sticky', left: 0, zIndex: 1, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                    <td className="px-5 py-3.5"
+                        style={{ position: 'sticky', left: 0, zIndex: 20, background: 'white', boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
                           {entry.name?.charAt(0)?.toUpperCase() || '?'}
@@ -2654,8 +2850,8 @@ function ProductSection({ company, showToast, currentUser }) {
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.pack_size || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.unit_of_measurement || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.created_at)}</td>
-                    <td className="px-5 py-3.5 whitespace-nowrap bg-white group-hover:bg-emerald-50/40"
-                        style={{ position: 'sticky', right: 0, zIndex: 1, boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
+                    <td className="px-5 py-3.5 whitespace-nowrap"
+                        style={{ position: 'sticky', right: 0, zIndex: 20, background: 'white', boxShadow: '-2px 0 4px -1px rgba(0,0,0,0.06)' }}>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                         <button onClick={() => openEdit(entry)}
                           className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
@@ -2785,6 +2981,7 @@ function ProductSection({ company, showToast, currentUser }) {
           </div>
         </div>
       )}
+      <CodeFormatSection type="product" company={company} showToast={showToast} onAfterSave={fetchEntries} />
     </div>
   )
 }
@@ -2961,17 +3158,20 @@ function MasterSection({ masterKey, company, showToast, currentUser }) {
           <div className="px-5 py-3 border-b border-gray-100">
             <p className="text-xs text-gray-400 font-medium">{filtered.length} of {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'}</p>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 22rem)' }}>
+          <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '100%' }}>
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {cfg.columns.map(col => (
                   <th key={col.key}
-                      className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide${col.sortable ? ' cursor-pointer select-none' : ''}`}
+                      className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide${col.sortable ? ' cursor-pointer select-none' : ''} bg-gray-50`}
+                      style={{ position: 'sticky', top: 0, zIndex: 2 }}
                       onClick={col.sortable ? () => toggleSort(col.sortable) : undefined}>
                     {col.label}{col.sortable && <SortIcon field={col.sortable} sortField={sortField} sortDir={sortDir} />}
                   </th>
                 ))}
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}>Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -3011,6 +3211,7 @@ function MasterSection({ masterKey, company, showToast, currentUser }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -3480,9 +3681,11 @@ function MasterReportModal({ title, rows, columns, company, onClose }) {
 }
 
 // ── Main Masters Component ────────────────────────────────────────────────────
-export default function Masters({ company, currentUser, isAdmin, onAddInquiry }) {
-  const [activeTab, setActiveTab] = useState('customers')
+export default function Masters({ company, currentUser, isAdmin, onAddInquiry, initialTab = 'customers' }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [toast, setToast]         = useState(null)
+
+  useEffect(() => { setActiveTab(initialTab) }, [initialTab])
 
   function showToast(msg, type) { setToast({ message: msg, type: type || 'success' }) }
 
@@ -3496,20 +3699,6 @@ export default function Masters({ company, currentUser, isAdmin, onAddInquiry })
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Masters</h1>
           <p className="text-gray-400 text-sm mt-0.5">{company}</p>
-        </div>
-
-        {/* Tab Bar */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-1.5 flex gap-1">
-          {TABS.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition
-                ${activeTab === tab.key
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
-              {tab.icon}
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          ))}
         </div>
 
         {/* Active Section */}

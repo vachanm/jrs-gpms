@@ -811,6 +811,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
   const [showNotifications, setShowNotifications] = useState(false)
   const notifRef = useRef(null)
   const [erpOpen, setErpOpen]                 = useState(activePage.startsWith('erp-'))
+  const [mastersOpen, setMastersOpen]         = useState(activePage.startsWith('masters-') || activePage === 'masters')
   const [showCompanyPicker, setShowCompanyPicker] = useState(false)
   const [companyPickerPos, setCompanyPickerPos] = useState(null)
   const userMenuRef       = useRef(null)
@@ -874,10 +875,6 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
       icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
     },
     {
-      id: 'masters', label: 'Masters',
-      icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>,
-    },
-    {
       id: 'wms', label: 'WMS', comingSoon: true,
       icon: <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" /></svg>,
     },
@@ -895,7 +892,31 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
     },
   ]
 
+  const MASTERS_SUB = [
+    {
+      id: 'masters-company', label: 'Company Master',
+      icon: <svg style={{ width: 15, height: 15 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+    },
+    {
+      id: 'masters-customers', label: 'Customer Master',
+      icon: <svg style={{ width: 15, height: 15 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
+    },
+    {
+      id: 'masters-vendors', label: 'Supplier Master',
+      icon: <svg style={{ width: 15, height: 15 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>,
+    },
+    {
+      id: 'masters-products', label: 'Product Master',
+      icon: <svg style={{ width: 15, height: 15 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>,
+    },
+    {
+      id: 'masters-storage', label: 'Storage Master',
+      icon: <svg style={{ width: 15, height: 15 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>,
+    },
+  ]
+
   const erpActive = activePage.startsWith('erp-')
+  const mastersActive = activePage.startsWith('masters-') || activePage === 'masters'
 
   return (
     <div data-theme={theme} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -1055,6 +1076,51 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
               onClick={() => setActivePage(item.id)}
             />
           ))}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 4px' }} />
+
+          {/* Masters parent */}
+          <button
+            onClick={() => collapsed ? setActivePage('masters-customers') : setMastersOpen(v => !v)}
+            title={collapsed ? 'Masters' : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: collapsed ? '9px 0' : '9px 10px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: mastersActive ? 'rgba(43,125,233,0.18)' : 'transparent',
+              color: mastersActive ? 'white' : 'rgba(255,255,255,0.5)',
+              fontSize: 13, fontWeight: mastersActive ? 500 : 400,
+              transition: 'background 0.15s, color 0.15s', marginBottom: 1,
+            }}
+            onMouseEnter={e => { if (!mastersActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'white' } }}
+            onMouseLeave={e => { if (!mastersActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' } }}
+          >
+            <svg style={{ width: 17, height: 17, flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+            </svg>
+            {!collapsed && (
+              <>
+                <span style={{ flex: 1 }}>Masters</span>
+                <svg style={{ width: 11, height: 11, transition: 'transform 0.2s', transform: mastersOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+
+          {/* Masters sub-items */}
+          {!collapsed && mastersOpen && MASTERS_SUB.map(item => (
+            <SidebarNavBtn
+              key={item.id}
+              {...item}
+              active={activePage === item.id}
+              collapsed={false}
+              indent
+              onClick={() => setActivePage(item.id)}
+            />
+          ))}
         </nav>
 
         {/* Bottom: user + collapse toggle */}
@@ -1196,7 +1262,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
       <main style={{ flex: 1, overflowY: 'auto', background: theme === 'dark' ? '#070e1b' : '#f1f5f9', display: 'flex', flexDirection: 'column' }}>
         {activePage === 'dashboard'     && <DashboardPage currentUser={currentUser} company={selectedCompany} setActivePage={setActivePage} />}
         {activePage === 'inquiries'     && <Inquiries company={selectedCompany} currentUser={currentUser} prefillCustomer={inquiryPrefill} onClearPrefill={() => setInquiryPrefill(null)} />}
-        {activePage === 'masters'       && <Masters company={selectedCompany} currentUser={currentUser} isAdmin={isAdmin} onAddInquiry={(customerName) => { setInquiryPrefill({ customer: customerName }); setActivePage('inquiries') }} />}
+        {(activePage === 'masters' || activePage.startsWith('masters-')) && <Masters company={selectedCompany} currentUser={currentUser} isAdmin={isAdmin} initialTab={activePage.startsWith('masters-') ? activePage.slice(8) : 'customers'} onAddInquiry={(customerName) => { setInquiryPrefill({ customer: customerName }); setActivePage('inquiries') }} />}
         {activePage === 'admin'         && isAdmin && <AdminModule company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'erp-estimates' && <Estimates company={selectedCompany} currentUser={currentUser} />}
         {activePage === 'wms' && (

@@ -206,35 +206,42 @@ export default function Estimates({ company, currentUser }) {
             <p className="text-gray-400 text-sm">No estimates found.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto overflow-y-auto rounded-2xl" style={{ maxHeight: 'calc(100vh - 22rem)' }}>
+          <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '100%' }}>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}
                     onClick={() => toggleSort('estimate_number')}>
                   Estimate # <SortIcon field="estimate_number" sortField={sortField} sortDir={sortDir} />
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}
                     onClick={() => toggleSort('created_at')}>
                   Date <SortIcon field="created_at" sortField={sortField} sortDir={sortDir} />
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}
                     onClick={() => toggleSort('customer_name')}>
                   Customer <SortIcon field="customer_name" sortField={sortField} sortDir={sortDir} />
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}
                     onClick={() => toggleSort('sales_rep')}>
                   Sales Rep <SortIcon field="sales_rep" sortField={sortField} sortDir={sortDir} />
                 </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}
                     onClick={() => toggleSort('total_amount')}>
                   Total <SortIcon field="total_amount" sortField={sortField} sortDir={sortDir} />
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none"
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}
                     onClick={() => toggleSort('status')}>
                   Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} />
                 </th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50"
+                    style={{ position: 'sticky', top: 0, zIndex: 2 }}>Actions</th>
               </tr>
             </thead>
             <tbody>

@@ -433,12 +433,13 @@ function ActivityLog() {
             <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 22rem)' }}>
+            <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '100%' }}>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   {['Timestamp', 'Employee', 'Module', 'Action', 'Record', 'Details'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
+                        style={{ position: 'sticky', top: 0, zIndex: 2 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -661,12 +662,13 @@ export default function AdminModule({ company }) {
               <p className="text-gray-400 text-sm mt-1">No pending approval requests.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 22rem)' }}>
+              <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '100%' }}>
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     {['Customer Name', 'Customer Code', 'Country', 'Contact 1', 'Email 1', 'Submitted By', 'Submitted On', 'Actions'].map(h => (
-                      <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50"
+                          style={{ position: 'sticky', top: 0, zIndex: 2 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
