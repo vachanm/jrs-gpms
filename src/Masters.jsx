@@ -2088,6 +2088,9 @@ const EMPTY_SUPPLIER = {
   approved_date: '', valid_through: '',
   license_number: '',
   license_validity: '',
+  bank_name: '', bank_address: '', bank_account_name: '',
+  bank_account_number: '', bank_routing_number: '',
+  bank_swift: '', bank_iban: '', bank_currency: '',
   remarks: '',
 }
 
@@ -2108,6 +2111,11 @@ const SUPPLIER_REPORT_COLS = [
   { label: 'Contact 1',        key: 'contact1_name' },
   { label: 'Email 1',          key: 'contact1_email' },
   { label: 'Phone 1',          key: 'contact1_phone' },
+  { label: 'Bank Name',        key: 'bank_name' },
+  { label: 'Account Name',     key: 'bank_account_name' },
+  { label: 'Account No.',      key: 'bank_account_number' },
+  { label: 'SWIFT',            key: 'bank_swift' },
+  { label: 'IBAN',             key: 'bank_iban' },
   { label: 'Remarks',          key: 'remarks' },
 ]
 
@@ -2589,6 +2597,21 @@ function SupplierSection({ company, showToast, currentUser }) {
                   <input type="date" className={inputCls(false)} value={form.license_validity}
                     onChange={e => setField('license_validity', e.target.value)} />
                 </Field>
+              </div>
+
+              {/* Bank Details */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Bank Details</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Bank Name"><input className={inputCls(false)} value={form.bank_name} placeholder="e.g. JPMorgan Chase" onChange={e => setField('bank_name', e.target.value)} /></Field>
+                  <Field label="Bank Address"><input className={inputCls(false)} value={form.bank_address} placeholder="Bank branch address" onChange={e => setField('bank_address', e.target.value)} /></Field>
+                  <Field label="Account Name"><input className={inputCls(false)} value={form.bank_account_name} placeholder="Account holder name" onChange={e => setField('bank_account_name', e.target.value)} /></Field>
+                  <Field label="Account Number"><input className={inputCls(false)} value={form.bank_account_number} placeholder="Account number" onChange={e => setField('bank_account_number', e.target.value)} /></Field>
+                  <Field label="Routing / Sort Code"><input className={inputCls(false)} value={form.bank_routing_number} placeholder="e.g. 021000021" onChange={e => setField('bank_routing_number', e.target.value)} /></Field>
+                  <Field label="SWIFT / BIC"><input className={inputCls(false)} value={form.bank_swift} placeholder="e.g. CHASUS33" onChange={e => setField('bank_swift', e.target.value)} /></Field>
+                  <Field label="IBAN"><input className={inputCls(false)} value={form.bank_iban} placeholder="e.g. NL02ABNA0123456789" onChange={e => setField('bank_iban', e.target.value)} /></Field>
+                  <Field label="Currency"><input className={inputCls(false)} value={form.bank_currency} placeholder="e.g. USD, EUR" onChange={e => setField('bank_currency', e.target.value)} /></Field>
+                </div>
               </div>
 
               {/* Remarks */}

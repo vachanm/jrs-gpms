@@ -1468,6 +1468,7 @@ export default function Inquiries({ company, currentUser, prefillCustomer, onCle
           currentUser={currentUser}
           company={company}
           masterCustomers={masterCustomers}
+          masterProducts={masterProducts}
         />
       )}
 

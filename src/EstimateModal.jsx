@@ -116,6 +116,10 @@ export async function generateEstimatePDF(data) {
 
   doc.setFont('helvetica')
 
+  // Top accent bar
+  doc.setFillColor(...BLUE)
+  doc.rect(0, 0, W, 3, 'F')
+
   function sectionLabel(x, y, text) {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(7)
@@ -130,72 +134,67 @@ export async function generateEstimatePDF(data) {
   const logoDataURL = await loadLogoDataURL()
 
   if (logoDataURL) {
-    doc.addImage(logoDataURL, 'PNG', lm, 7, 70, 24)
+    doc.addImage(logoDataURL, 'PNG', lm, 6, 95, 28)
   } else {
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
+    doc.setFontSize(11)
     doc.setTextColor(...BLUE)
-    doc.text('JUPITER RESEARCH SERVICES', lm, 21)
+    doc.text('JUPITER RESEARCH SERVICES', lm, 22)
   }
 
   // Company contact — right-aligned with consistent 3.8mm line spacing
   const rX = W - rm
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
-  doc.text(coName, rX, 12, { align: 'right' })
+  doc.text(coName, rX, 13, { align: 'right' })
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...GRAY)
   const addrWrapped = doc.splitTextToSize(coAddress || '', 90)
-  let coY = 17
+  let coY = 18
   addrWrapped.forEach(ln => { doc.text(ln, rX, coY, { align: 'right' }); coY += 3.8 })
   if (coWebsite) doc.text(coWebsite, rX, coY + 1, { align: 'right' })
 
-  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.4)
-  doc.line(lm, 35, W - rm, 35)
+  const banY = 39
+  doc.setFillColor(...BLUE)
+  doc.rect(lm, banY, uw, 10, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(...WHITE)
+  doc.text('ESTIMATE', lm + 4, banY + 6.5)
 
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...BLUE)
-  doc.text('ESTIMATE', lm, 44)
-
-  // ── ADDRESS BOXES ────────────────────────────────────────────────
-  const secY   = 51
-  const ADDR_W = 88
+  // ── 3-COLUMN LAYOUT: Bill To | Ship To | Estimate Details ────────
+  const secY   = 53
+  const COL_W  = 56
+  const DET_W  = 60
+  const COL2_X = lm + COL_W + 5
+  const DET_X  = COL2_X + COL_W + 5
   const PX     = 4
   const PY     = 4
 
-  function calcAddrBoxH(nameLine, lines) {
-    const count = [nameLine, ...lines].filter(Boolean).length
+  function calcAddrBoxH(nameLine, lines, textW) {
+    let count = 0
+    if (nameLine) count += doc.splitTextToSize(nameLine, textW).length
+    lines.filter(Boolean).forEach(ln => { count += doc.splitTextToSize(ln, textW).length })
     return PY + 7 + count * 4.8 + PY
   }
 
-  function drawAddrBox(x, y, label, nameLine, lines) {
-    const h = calcAddrBoxH(nameLine, lines)
+  function drawAddrBox(x, y, label, nameLine, lines, boxW, forceH) {
+    const textW = boxW - PX * 2
+    const h = forceH || calcAddrBoxH(nameLine, lines, textW)
     doc.setFillColor(247, 248, 252)
     doc.setDrawColor(210, 215, 228)
     doc.setLineWidth(0.1)
-    doc.roundedRect(x, y, ADDR_W, h, 2, 2, 'FD')
+    doc.roundedRect(x, y, boxW, h, 2, 2, 'FD')
     sectionLabel(x + PX, y + PY + 3.5, label)
     let cy = y + PY + 11
     if (nameLine) {
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
-      doc.text(nameLine, x + PX, cy); cy += 4.8
+      doc.splitTextToSize(nameLine, textW).forEach(wl => { doc.text(wl, x + PX, cy); cy += 4.8 })
     }
     lines.filter(Boolean).forEach(ln => {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY)
-      doc.text(ln, x + PX, cy); cy += 4.8
+      doc.splitTextToSize(ln, textW).forEach(wl => { doc.text(wl, x + PX, cy); cy += 4.8 })
     })
     return y + h
   }
-
-  const b1Bottom   = drawAddrBox(lm, secY,          'CUSTOMER ADDRESS', billToName, [billToAddr1, billToAddr2, billToCountry])
-  const b2Bottom   = drawAddrBox(lm, b1Bottom + 4,  'SHIPPING ADDRESS', shipToName, [shipToAddr1, shipToAddr2, shipToCountry])
-  const leftBottom = b2Bottom
-
-  // ── SALES QUOTE — clean two-column grid, no pills ────────────────
-  const rcX    = lm + ADDR_W + 6
-  const QLBL_W = 28
-  const QVAL_W = W - rm - rcX - QLBL_W - 2
-  let rightY   = secY
-
-  sectionLabel(rcX, rightY, 'SALES QUOTE')
-  rightY += 8
 
   const quoteRows = [
     ['ESTIMATE #',   estNum],
@@ -204,21 +203,37 @@ export async function generateEstimatePDF(data) {
     validTill          ? ['VALID TILL',   formatDateDisplay(validTill)] : null,
     effectiveIncoterms ? ['INCOTERMS',     effectiveIncoterms]          : null,
     effectivePayTerms  ? ['PAYMENT TERMS', effectivePayTerms]           : null,
-    poNo               ? ['PO NO.',         poNo]                       : null,
-    note               ? ['NOTE',           note]                       : null,
+    poNo               ? ['PO NO.',        poNo]                        : null,
+    note               ? ['NOTE',          note]                        : null,
   ].filter(Boolean)
 
+  const b1H = calcAddrBoxH(billToName, [billToAddr1, billToAddr2, billToCountry], COL_W - PX * 2)
+  const b2H = calcAddrBoxH(shipToName, [shipToAddr1, shipToAddr2, shipToCountry], COL_W - PX * 2)
+  const detailBoxH = PY + 7 + quoteRows.length * 6 + PY
+  const tallestBoxH = Math.max(b1H, b2H, detailBoxH)
+
+  drawAddrBox(lm,     secY, 'CUSTOMER ADDRESS', billToName, [billToAddr1, billToAddr2, billToCountry], COL_W, tallestBoxH)
+  drawAddrBox(COL2_X, secY, 'SHIPPING ADDRESS', shipToName, [shipToAddr1, shipToAddr2, shipToCountry], COL_W, tallestBoxH)
+
+  // Estimate details box (right column) — same height as address boxes
+  doc.setFillColor(247, 248, 252)
+  doc.setDrawColor(210, 215, 228)
+  doc.setLineWidth(0.1)
+  doc.roundedRect(DET_X, secY, DET_W, tallestBoxH, 2, 2, 'FD')
+  sectionLabel(DET_X + PX, secY + PY + 3.5, 'ESTIMATE DETAILS')
+  let rightY = secY + PY + 11
   quoteRows.forEach(([label, value]) => {
-    doc.setFont('helvetica', 'bold');   doc.setFontSize(7.5); doc.setTextColor(...GRAY)
-    doc.text(label, rcX, rightY)
-    const valLines = doc.splitTextToSize(String(value), QVAL_W)
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
-    doc.text(valLines, rcX + QLBL_W, rightY)
-    rightY += 6 * valLines.length
+    doc.setFont('helvetica', 'bold');   doc.setFontSize(6.5); doc.setTextColor(...GRAY)
+    doc.text(label, DET_X + PX, rightY)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...DARK)
+    doc.text(String(value), DET_X + PX + 24, rightY)
+    rightY += 6
   })
 
+  const leftBottom = secY + tallestBoxH
+
   // ── LINE ITEMS TABLE ─────────────────────────────────────────────
-  const tY = Math.max(leftBottom, rightY) + 7
+  const tY = leftBottom + 5
 
   const cw      = [12, 84, 15, 13, 29, 29]
   const cLabels = ['LINE', 'CODE & DESCRIPTION', 'QTY', 'U/M', 'UNIT PRICE', 'TOTAL']
@@ -238,8 +253,8 @@ export async function generateEstimatePDF(data) {
   drawTableHeader(tY)
 
   const SUB_H     = 4.5
-  const SUB_LBL_W = 16
-  const SUB_CPR   = 4
+  const SUB_LBL_W = 18
+  const SUB_CPR   = 3
   const subPairW  = uw / SUB_CPR
 
   let ry = tY + thH
@@ -253,12 +268,12 @@ export async function generateEstimatePDF(data) {
     const mainH     = Math.max(10, descLines.length * 4.5 + 5)
 
     const subFields = [
-      item.ndcCode  && ['NDC/MA',    item.ndcCode],
-      item.packSize && ['Pack Size', item.packSize],
-      item.lotNo    && ['Lot #',     item.lotNo],
-      item.batchNo  && ['Batch #',   item.batchNo],
-      item.expiry   && ['Expiry',    item.expiry],
-      item.htsCode  && ['HTS Code',  item.htsCode],
+      item.ndcCode      && ['NDC/MA',       item.ndcCode],
+      item.packSize     && ['Pack Size',    item.packSize],
+      item.manufacturer && ['Manufacturer', item.manufacturer],
+      item.batchNo      && ['Batch #',      item.batchNo],
+      item.expiry       && ['Expiry',       item.expiry],
+      item.htsCode      && ['HTS Code',     item.htsCode],
     ].filter(Boolean)
 
     const subRowCount = subFields.length > 0 ? Math.ceil(subFields.length / SUB_CPR) : 0
@@ -309,12 +324,12 @@ export async function generateEstimatePDF(data) {
         const valW = subPairW - SUB_LBL_W - 0.5
         doc.setFillColor(...SLBL)
         doc.rect(sx, sy, SUB_LBL_W, SUB_H, 'F')
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(5.8); doc.setTextColor(50, 70, 130)
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(50, 70, 130)
         doc.text(label, sx + 1.5, sy + SUB_H * 0.73)
         doc.setFillColor(...SVAL)
         doc.rect(sx + SUB_LBL_W, sy, valW, SUB_H, 'F')
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(5.8); doc.setTextColor(...DARK)
-        doc.text(String(value).substring(0, 16), sx + SUB_LBL_W + 1.5, sy + SUB_H * 0.73)
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...DARK)
+        doc.text(String(value).substring(0, 24), sx + SUB_LBL_W + 1.5, sy + SUB_H * 0.73)
         sx += subPairW
       })
       ry += subTotalH
@@ -324,18 +339,20 @@ export async function generateEstimatePDF(data) {
     doc.line(lm, ry, W - rm, ry)
   })
 
-  // ── TOTAL ROW — larger, dark blue ───────────────────────────────
-  ry += 6
+  // ── TOTAL ROW — highlighted ───────────────────────────────────────
+  ry += 4
   const c5xTotal = lm + cw[0] + cw[1] + cw[2] + cw[3] + cw[4]
-  doc.setDrawColor(...LGRAY); doc.setLineWidth(0.4)
-  doc.line(c5xTotal, ry - 4, W - rm, ry - 4)
+  doc.setFillColor(235, 241, 255)
+  doc.rect(lm, ry, uw, 10, 'F')
+  doc.setDrawColor(...BLUE); doc.setLineWidth(0.4)
+  doc.line(lm, ry, lm + uw, ry)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE)
-  doc.text('TOTAL',                                       c5xTotal - 2, ry + 5, { align: 'right' })
-  doc.text(`${primaryCurrency} ${grandTotal.toFixed(2)}`, W - rm - 2,  ry + 5, { align: 'right' })
+  doc.text(`TOTAL (${primaryCurrency})`, c5xTotal - 2, ry + 6.5, { align: 'right' })
+  doc.text(grandTotal.toFixed(2),        W - rm - 2,   ry + 6.5, { align: 'right' })
   ry += 14
 
-  // ── FOOTER ───────────────────────────────────────────────────────
-  const ftY  = ry
+  // ── FOOTER — pinned to bottom on sparse pages ────────────────────
+  const ftY  = Math.max(ry, H - 78)
   const nW   = 100
   const divX = lm + nW + 3
   const bkX  = divX + 4
@@ -391,6 +408,10 @@ export async function generateEstimatePDF(data) {
   doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(...GRAY)
   doc.text(doc.splitTextToSize(taglineText, uw), W / 2, tgY, { align: 'center' })
 
+  // Bottom accent bar — mirrors the top bar
+  doc.setFillColor(...BLUE)
+  doc.rect(0, H - 3, W, 3, 'F')
+
   doc.save(`Estimate-${estNum}.pdf`)
 }
 
@@ -409,7 +430,7 @@ function ModeToggle({ mode, onChange }) {
   )
 }
 
-export default function EstimateModal({ open, onClose, selectedInquiries = [], currentUser, company, masterCustomers = [] }) {
+export default function EstimateModal({ open, onClose, selectedInquiries = [], currentUser, company, masterCustomers = [], masterProducts = [] }) {
   console.log('[EstimateModal] company prop:', company, '→ resolved key:', resolveCompany(company))
 
   const estNum = useRef(generateEstimateNumber())
@@ -479,12 +500,14 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     setPoNo(''); setPayTermsMode('pick'); setPayTerms('Net 30'); setPayTermsManual('')
     setValidTill(''); setIncotermsMode('pick'); setIncoterms('ExW'); setIncotermsManual('')
     setNote('')
-    setBankOpen(false)
+    setBankOpen(true)
     setToast(null)
 
     // Load company profile from DB, fall back to hardcoded config
     const cfg = COMPANY_CONFIG[resolveCompany(company)]
-    supabase.from('company_master').select('*').eq('company', company).single().then(({ data: cm }) => {
+    const companyKey = resolveCompany(company)
+    supabase.from('company_master').select('*').then(({ data: cmRows }) => {
+      const cm = cmRows?.find(row => row.company && resolveCompany(row.company) === companyKey) || null
       if (cm) {
         const addrParts = [cm.address1, cm.address2, cm.city, cm.state, cm.postal_code, cm.country].filter(Boolean)
         setCoAddress(addrParts.join(', '))
@@ -512,21 +535,24 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     })
 
     setLineItems(
-      selectedInquiries.map((inq, i) => ({
-        _key: `${inq.id}-${i}`,
-        item: `US-${String(i + 1).padStart(2, '0')}`,
-        description: [inq.product, inq.manufacturer].filter(Boolean).join(' / '),
-        ndcCode: inq.ndc_ma_code || '',
-        packSize: '',
-        lotNo: '',
-        batchNo: '',
-        expiry: '',
-        htsCode: '',
-        qty: String(inq.quantity ?? ''),
-        um: 'ea',
-        unitPrice: String(inq.quote_price ?? ''),
-        currency: inq.currency || 'USD',
-      }))
+      selectedInquiries.map((inq, i) => {
+        const prod = masterProducts.find(p => p.name === inq.product)
+        return {
+          _key: `${inq.id}-${i}`,
+          item: prod?.product_code || `US-${String(i + 1).padStart(2, '0')}`,
+          description: inq.product || '',
+          ndcCode: inq.ndc_ma_code || prod?.ndc_ma_code || '',
+          packSize: prod?.pack_size || '',
+          manufacturer: inq.manufacturer || prod?.manufacturer || '',
+          batchNo: '',
+          expiry: '',
+          htsCode: '',
+          qty: String(inq.quantity ?? ''),
+          um: 'ea',
+          unitPrice: String(inq.quote_price ?? ''),
+          currency: inq.currency || 'USD',
+        }
+      })
     )
   }, [open, company])
 
@@ -568,7 +594,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
   function addItem() {
     setLineItems(prev => [...prev, {
       _key: `extra-${Date.now()}`,
-      item: '', description: '', ndcCode: '', packSize: '', lotNo: '', batchNo: '', expiry: '', htsCode: '',
+      item: '', description: '', ndcCode: '', packSize: '', manufacturer: '', batchNo: '', expiry: '', htsCode: '',
       qty: '', um: 'ea', unitPrice: '', currency: primaryCurrency,
     }])
   }
@@ -924,7 +950,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                             <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)}
                               className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 mb-1.5" />
                             <div className="grid grid-cols-3 gap-1">
-                              {[['ndcCode','NDC#'],['packSize','Pack Size'],['lotNo','Lot#'],['batchNo','Batch#'],['expiry','Expiry'],['htsCode','HTS Code']].map(([f, ph]) => (
+                              {[['ndcCode','NDC#'],['packSize','Pack Size'],['manufacturer','Manufacturer'],['batchNo','Batch#'],['expiry','Expiry'],['htsCode','HTS Code']].map(([f, ph]) => (
                                 <input key={f} value={item[f]} onChange={e => updateItem(idx, f, e.target.value)}
                                   placeholder={ph}
                                   className="px-1.5 py-0.5 border border-gray-100 rounded text-[10px] text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-gray-50/70" />
