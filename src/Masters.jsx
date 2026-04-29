@@ -504,8 +504,9 @@ async function generateSupplierCode(country, company) {
 }
 
 async function generateProductCode(country, materialType, company) {
-  const { data } = await supabase.from('code_formats').select('prefix').eq('type', 'product').eq('country', country).eq('company', company).maybeSingle()
-  const iso = data?.prefix || COUNTRY_ISO2[country] || 'XX'
+  const normalized = COUNTRIES.find(c => c.toLowerCase() === (country || '').toLowerCase().trim()) || country || ''
+  const { data } = await supabase.from('code_formats').select('prefix').eq('type', 'product').eq('country', normalized).eq('company', company).maybeSingle()
+  const iso = data?.prefix || COUNTRY_ISO2[normalized] || 'XX'
   const mt = MATERIAL_TYPES.find(m => m.label === materialType)
   const typeCode = mt ? mt.code : 'PR'
   const prefix = `${iso}${typeCode}`
@@ -792,11 +793,19 @@ function MasterImportModal({ file, tableKey, company, onClose, onImported }) {
       })
 
     if (cfg.codeField) {
-      const { data: existing } = await supabase.from(tableKey).select(cfg.codeField).eq('company', company)
-      const rx = new RegExp(`^${cfg.codePrefix}-\\d+$`)
-      const nums = (existing || []).map(r => r[cfg.codeField]).filter(c => c && rx.test(c)).map(c => parseInt(c.replace(`${cfg.codePrefix}-`, ''), 10))
-      let next = nums.length > 0 ? Math.max(...nums) + 1 : 1
-      toInsert = toInsert.map(row => ({ ...row, [cfg.codeField]: `${cfg.codePrefix}-${String(next++).padStart(3, '0')}` }))
+      if (tableKey === 'products_master') {
+        const rows = []
+        for (const row of toInsert) {
+          rows.push({ ...row, product_code: await generateProductCode(row.country_of_origin, row.material_type, company) })
+        }
+        toInsert = rows
+      } else {
+        const { data: existing } = await supabase.from(tableKey).select(cfg.codeField).eq('company', company)
+        const rx = new RegExp(`^${cfg.codePrefix}-\\d+$`)
+        const nums = (existing || []).map(r => r[cfg.codeField]).filter(c => c && rx.test(c)).map(c => parseInt(c.replace(`${cfg.codePrefix}-`, ''), 10))
+        let next = nums.length > 0 ? Math.max(...nums) + 1 : 1
+        toInsert = toInsert.map(row => ({ ...row, [cfg.codeField]: `${cfg.codePrefix}-${String(next++).padStart(3, '0')}` }))
+      }
     }
 
     setImporting(true)
@@ -2748,6 +2757,11 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
     setSaving(true)
     const payload = { ...form, company }
     if (editing) {
+      const countryChanged  = form.country_of_origin !== editing.country_of_origin
+      const materialChanged = form.material_type !== editing.material_type
+      if (countryChanged || materialChanged) {
+        payload.product_code = await generateProductCode(form.country_of_origin, form.material_type, company)
+      }
       const { error } = await supabase.from('products_master').update(payload).eq('id', editing.id)
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       logActivity({ actor: currentUser, company, module: 'Products Master', action: 'edited', recordId: editing.id, recordLabel: form.name })
