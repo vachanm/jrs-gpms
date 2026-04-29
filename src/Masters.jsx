@@ -1533,11 +1533,13 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
               {recoding ? 'Updating…' : `Fix Codes (${legacyEntries.length})`}
             </button>
           )}
+          {isAdmin && (
           <button onClick={() => setShowReport(true)}
             className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Report
           </button>
+          )}
           <button onClick={openAdd}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -2119,7 +2121,7 @@ const SUPPLIER_REPORT_COLS = [
   { label: 'Remarks',          key: 'remarks' },
 ]
 
-function SupplierSection({ company, showToast, currentUser }) {
+function SupplierSection({ company, showToast, currentUser, isAdmin }) {
   const [entries, setEntries]             = useState([])
   const [loading, setLoading]             = useState(true)
   const [showForm, setShowForm]           = useState(false)
@@ -2273,11 +2275,13 @@ function SupplierSection({ company, showToast, currentUser }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             Import
           </button>
+          {isAdmin && (
           <button onClick={() => setShowReport(true)}
             className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Report
           </button>
+          )}
           <button onClick={openAdd}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -2670,7 +2674,7 @@ const PRODUCT_REPORT_COLS = [
   { label: 'Remarks',       key: 'remarks' },
 ]
 
-function ProductSection({ company, showToast, currentUser }) {
+function ProductSection({ company, showToast, currentUser, isAdmin }) {
   const [entries, setEntries]         = useState([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
@@ -2808,11 +2812,13 @@ function ProductSection({ company, showToast, currentUser }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             Import
           </button>
+          {isAdmin && (
           <button onClick={() => setShowReport(true)}
             className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Report
           </button>
+          )}
           <button onClick={openAdd}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -3052,7 +3058,7 @@ function ProductSection({ company, showToast, currentUser }) {
 }
 
 // ── Generic Master Section (vendors / products / storage) ─────────────────────
-function MasterSection({ masterKey, company, showToast, currentUser }) {
+function MasterSection({ masterKey, company, showToast, currentUser, isAdmin }) {
   const cfg = MASTERS[masterKey]
   const [entries, setEntries]     = useState([])
   const [loading, setLoading]     = useState(true)
@@ -3176,11 +3182,13 @@ function MasterSection({ masterKey, company, showToast, currentUser }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             Import
           </button>
+          {isAdmin && (
           <button onClick={() => setShowReport(true)}
             className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Report
           </button>
+          )}
           <button onClick={openAdd}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -3334,8 +3342,8 @@ const EMPTY_CO = {
   postal_code: '', phone: '', fax: '', email: '', website: '',
   tax_id: '', vat_number: '',
   bank_name: '', bank_address: '', bank_account_name: '',
-  bank_account_number: '', bank_routing_number: '', bank_swift: '',
-  bank_iban: '', bank_currency: '',
+  bank_account_number: '', bank_routing_number: '', bank_routing_wire: '',
+  bank_swift: '', bank_iban: '', bank_currency: '',
 }
 
 const COMPANY_REPORT_COLS = [
@@ -3356,7 +3364,7 @@ const COMPANY_REPORT_COLS = [
   { label: 'IBAN',           key: 'bank_iban' },
 ]
 
-function CompanyMaster({ showToast }) {
+function CompanyMaster({ showToast, isAdmin }) {
   const [activeKey, setActiveKey]   = useState(COMPANY_PROFILES[0].key)
   const [profiles, setProfiles]     = useState({})
   const [editing, setEditing]       = useState(false)
@@ -3487,7 +3495,8 @@ function CompanyMaster({ showToast }) {
               <Field label="Bank Address"><input className={inputCls(false)} value={form.bank_address} onChange={e => sf('bank_address', e.target.value)} placeholder="Bank branch address" /></Field>
               <Field label="Account Name"><input className={inputCls(false)} value={form.bank_account_name} onChange={e => sf('bank_account_name', e.target.value)} placeholder="Account holder name" /></Field>
               <Field label="Account Number"><input className={inputCls(false)} value={form.bank_account_number} onChange={e => sf('bank_account_number', e.target.value)} placeholder="Account number" /></Field>
-              <Field label="Routing / Sort Code"><input className={inputCls(false)} value={form.bank_routing_number} onChange={e => sf('bank_routing_number', e.target.value)} placeholder="e.g. 021000021" /></Field>
+              <Field label="Routing ACH"><input className={inputCls(false)} value={form.bank_routing_number} onChange={e => sf('bank_routing_number', e.target.value)} placeholder="e.g. 021202337" /></Field>
+              <Field label="Routing Wire"><input className={inputCls(false)} value={form.bank_routing_wire} onChange={e => sf('bank_routing_wire', e.target.value)} placeholder="e.g. 021000021" /></Field>
               <Field label="SWIFT / BIC"><input className={inputCls(false)} value={form.bank_swift} onChange={e => sf('bank_swift', e.target.value)} placeholder="e.g. CHASUS33" /></Field>
               <Field label="IBAN"><input className={inputCls(false)} value={form.bank_iban} onChange={e => sf('bank_iban', e.target.value)} placeholder="e.g. NL02ABNA0123456789" /></Field>
               <Field label="Currency"><input className={inputCls(false)} value={form.bank_currency} onChange={e => sf('bank_currency', e.target.value)} placeholder="e.g. USD, EUR, INR" /></Field>
@@ -3503,7 +3512,7 @@ function CompanyMaster({ showToast }) {
               <p className="text-xs text-gray-400 mt-0.5">{activeKey}</p>
             </div>
             <div className="flex gap-2">
-              {hasData && (
+              {hasData && isAdmin && (
                 <button onClick={() => setShowReport(true)}
                   className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium transition shadow-sm">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -3560,7 +3569,8 @@ function CompanyMaster({ showToast }) {
                   <ViewRow label="Bank Address" value={profile.bank_address} />
                   <ViewRow label="Account Name" value={profile.bank_account_name} />
                   <ViewRow label="Account Number" value={profile.bank_account_number} />
-                  <ViewRow label="Routing / Sort" value={profile.bank_routing_number} />
+                  <ViewRow label="Routing ACH" value={profile.bank_routing_number} />
+                  <ViewRow label="Routing Wire" value={profile.bank_routing_wire} />
                   <ViewRow label="SWIFT / BIC" value={profile.bank_swift} />
                   <ViewRow label="IBAN" value={profile.bank_iban} />
                   <ViewRow label="Currency" value={profile.bank_currency} />
@@ -3768,14 +3778,14 @@ export default function Masters({ company, currentUser, isAdmin, onAddInquiry, i
 
         {/* Active Section */}
         {activeTab === 'company'
-          ? <CompanyMaster key="company" showToast={showToast} />
+          ? <CompanyMaster key="company" showToast={showToast} isAdmin={isAdmin} />
           : activeTab === 'customers'
             ? <CustomerSection key="customers" company={company} showToast={showToast} currentUser={currentUser} isAdmin={isAdmin} onAddInquiry={onAddInquiry} />
             : activeTab === 'vendors'
-              ? <SupplierSection key="vendors" company={company} showToast={showToast} currentUser={currentUser} />
+              ? <SupplierSection key="vendors" company={company} showToast={showToast} currentUser={currentUser} isAdmin={isAdmin} />
               : activeTab === 'products'
-                ? <ProductSection key="products" company={company} showToast={showToast} currentUser={currentUser} />
-                : <MasterSection key={activeTab} masterKey={activeTab} company={company} showToast={showToast} currentUser={currentUser} />
+                ? <ProductSection key="products" company={company} showToast={showToast} currentUser={currentUser} isAdmin={isAdmin} />
+                : <MasterSection key={activeTab} masterKey={activeTab} company={company} showToast={showToast} currentUser={currentUser} isAdmin={isAdmin} />
         }
 
       </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 
-// ── Task storage (user-scoped, not company-dependent) ─────────────────────────
+// ── Task storage ──────────────────────────────────────────────────────────────
 function loadTasks(userId) {
   try { return JSON.parse(localStorage.getItem(`jrs_tasks_${userId}`)) || [] }
   catch { return [] }
@@ -20,99 +20,183 @@ function formatDate(iso) {
 
 function dueDateStatus(dueDate, done) {
   const today = new Date().toISOString().split('T')[0]
-  if (done) return { label: `📅 ${formatDate(dueDate)}`, colorClass: 'text-gray-400' }
-  if (dueDate < today) return { label: `⚠ Overdue · ${formatDate(dueDate)}`, colorClass: 'text-red-500' }
-  if (dueDate === today) return { label: '📅 Due today', colorClass: 'text-amber-600' }
-  return { label: `📅 ${formatDate(dueDate)}`, colorClass: 'text-blue-500' }
+  if (done) return { label: formatDate(dueDate), colorClass: 'text-gray-400' }
+  if (dueDate < today) return { label: `Overdue · ${formatDate(dueDate)}`, colorClass: 'text-red-500' }
+  if (dueDate === today) return { label: 'Due today', colorClass: 'text-amber-600' }
+  return { label: formatDate(dueDate), colorClass: 'text-blue-500' }
 }
 
+const PRIORITY_DOT = { high: 'bg-red-500', medium: 'bg-amber-400', low: 'bg-emerald-500' }
 const PRIORITY_STYLE = {
   high:   'bg-red-50 text-red-600 border border-red-200',
   medium: 'bg-amber-50 text-amber-600 border border-amber-200',
   low:    'bg-emerald-50 text-emerald-600 border border-emerald-200',
 }
-const PRIORITY_DOT = { high: 'bg-red-500', medium: 'bg-amber-500', low: 'bg-emerald-500' }
 
-// ── Tasks Card ────────────────────────────────────────────────────────────────
+// ── Greeting ──────────────────────────────────────────────────────────────────
+function greeting(name) {
+  const h = new Date().getHours()
+  const salutation = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
+  return `${salutation}, ${name.split(' ')[0]}`
+}
+
+// ── KPI Stat Card ─────────────────────────────────────────────────────────────
+function StatCard({ label, value, icon, iconBg, iconColor, thisWeek, onClick, loading }) {
+  return (
+    <button onClick={onClick}
+      className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-5 flex items-center gap-4 text-left hover:shadow-md hover:border-gray-200 transition-all w-full group">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+        <svg className={`w-6 h-6 ${iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {icon}
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
+        {loading ? (
+          <div className="mt-1 w-8 h-7 bg-gray-100 rounded animate-pulse" />
+        ) : (
+          <p className="text-3xl font-bold text-gray-900 leading-tight">{value ?? '—'}</p>
+        )}
+        {!loading && thisWeek != null && thisWeek > 0 && (
+          <p className="text-[11px] text-emerald-600 font-medium mt-0.5">+{thisWeek} this week</p>
+        )}
+      </div>
+    </button>
+  )
+}
+
+// ── Inquiry Pipeline ──────────────────────────────────────────────────────────
+function PipelinePanel({ stats, loading, onNavigate }) {
+  const total = stats?.total || 0
+  const stages = [
+    { label: 'Leads',     value: stats?.leads     ?? 0, color: 'bg-amber-500',  ring: 'border-amber-400',  text: 'text-amber-600',  light: 'bg-amber-50' },
+    { label: 'Prospects', value: stats?.prospects  ?? 0, color: 'bg-purple-500', ring: 'border-purple-400', text: 'text-purple-600', light: 'bg-purple-50' },
+    { label: 'Active',    value: stats?.active     ?? 0, color: 'bg-emerald-500',ring: 'border-emerald-400',text: 'text-emerald-600',light: 'bg-emerald-50' },
+  ]
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full">
+      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-50">
+        <div>
+          <h2 className="text-sm font-bold text-gray-900">Inquiry Pipeline</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {loading ? 'Loading…' : `${total} total inquiries`}
+          </p>
+        </div>
+        <button onClick={onNavigate}
+          className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition">
+          View all
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex-1 flex flex-col justify-center px-5 py-6">
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* Funnel stages */}
+            <div className="flex items-center gap-2">
+              {stages.map((s, i) => (
+                <div key={s.label} className="flex items-center flex-1 gap-2">
+                  <div className={`flex-1 rounded-xl px-4 py-5 flex flex-col items-center text-center border-2 ${s.ring} ${s.light}`}>
+                    <p className={`text-4xl font-extrabold ${s.text}`}>{s.value}</p>
+                    <p className="text-xs font-semibold text-gray-500 mt-1 uppercase tracking-wide">{s.label}</p>
+                    {total > 0 && (
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {Math.round((s.value / total) * 100)}%
+                      </p>
+                    )}
+                  </div>
+                  {i < stages.length - 1 && (
+                    <svg className="w-5 h-5 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Progress bar breakdown */}
+            {total > 0 && (
+              <div className="mt-5">
+                <div className="flex rounded-full overflow-hidden h-2 bg-gray-100">
+                  {stages.map(s => (
+                    <div key={s.label}
+                      className={`${s.color} h-full transition-all`}
+                      style={{ width: `${(s.value / total) * 100}%` }}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-4 mt-2">
+                  {stages.map(s => (
+                    <div key={s.label} className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full inline-block ${s.color}`} />
+                      <span className="text-[11px] text-gray-500">{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Compact Tasks ─────────────────────────────────────────────────────────────
 function TasksCard({ currentUser }) {
-  const [tasks, setTasks]           = useState(() => loadTasks(currentUser.id))
-  const [input, setInput]           = useState('')
-  const [priority, setPriority]     = useState('medium')
-  const [dueDate, setDueDate]       = useState('')
-  const [filter, setFilter]         = useState('all')
-  const [editId, setEditId]         = useState(null)
-  const [editText, setEditText]     = useState('')
+  const [tasks, setTasks]             = useState(() => loadTasks(currentUser.id))
+  const [input, setInput]             = useState('')
+  const [priority, setPriority]       = useState('medium')
+  const [dueDate, setDueDate]         = useState('')
+  const [filter, setFilter]           = useState('all')
+  const [editId, setEditId]           = useState(null)
+  const [editText, setEditText]       = useState('')
   const [editDueDate, setEditDueDate] = useState('')
-  const inputRef        = useRef(null)
-  const dueDateRef      = useRef(null)
-  const editDueDateRef  = useRef(null)
-  const suppressBlurRef = useRef(false)
+  const inputRef       = useRef(null)
+  const dueDateRef     = useRef(null)
+  const editDueDateRef = useRef(null)
+  const suppressBlur   = useRef(false)
 
-  function persist(next) {
-    setTasks(next)
-    saveTasks(currentUser.id, next)
-  }
-
+  function persist(next) { setTasks(next); saveTasks(currentUser.id, next) }
   function addTask() {
     const text = input.trim()
     if (!text) return
     persist([{ id: Date.now().toString(), text, done: false, priority, createdAt: new Date().toISOString(), dueDate: dueDate || null }, ...tasks])
-    setInput('')
-    setDueDate('')
+    setInput(''); setDueDate('')
     inputRef.current?.focus()
   }
-
-  function toggleDone(id) {
-    persist(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t))
-  }
-
-  function deleteTask(id) {
-    persist(tasks.filter(t => t.id !== id))
-  }
-
-  function clearDone() {
-    persist(tasks.filter(t => !t.done))
-  }
-
-  function startEdit(task) {
-    setEditId(task.id)
-    setEditText(task.text)
-    setEditDueDate(task.dueDate || '')
-  }
-
+  function toggleDone(id) { persist(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t)) }
+  function deleteTask(id) { persist(tasks.filter(t => t.id !== id)) }
+  function clearDone()    { persist(tasks.filter(t => !t.done)) }
+  function startEdit(task) { setEditId(task.id); setEditText(task.text); setEditDueDate(task.dueDate || '') }
   function saveEdit(id) {
     const text = editText.trim()
     if (!text) { setEditId(null); return }
     persist(tasks.map(t => t.id === id ? { ...t, text, dueDate: editDueDate || null } : t))
-    setEditId(null)
-    setEditDueDate('')
+    setEditId(null); setEditDueDate('')
   }
 
-  const filtered = tasks.filter(t =>
-    filter === 'all' ? true : filter === 'pending' ? !t.done : t.done
-  )
+  const filtered     = tasks.filter(t => filter === 'all' ? true : filter === 'pending' ? !t.done : t.done)
   const doneCount    = tasks.filter(t => t.done).length
   const pendingCount = tasks.filter(t => !t.done).length
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col" style={{ minHeight: '440px' }}>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-50">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-gray-900">My Tasks</h2>
-            <p className="text-xs text-gray-400">
-              {pendingCount} pending · {doneCount} done
-            </p>
-          </div>
+      <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-50">
+        <div>
+          <h2 className="text-sm font-bold text-gray-900">My Tasks</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{pendingCount} pending · {doneCount} done</p>
         </div>
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-          {[['all', 'All'], ['pending', 'Pending'], ['done', 'Done']].map(([val, label]) => (
+        <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          {[['all','All'],['pending','Pending'],['done','Done']].map(([val, label]) => (
             <button key={val} onClick={() => setFilter(val)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
                 filter === val ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -123,44 +207,33 @@ function TasksCard({ currentUser }) {
         </div>
       </div>
 
-      {/* Add task input */}
-      <div className="flex gap-2 px-5 py-3 border-b border-gray-50">
+      {/* Add input */}
+      <div className="flex gap-2 px-4 py-3 border-b border-gray-50">
         <select value={priority} onChange={e => setPriority(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-2 text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white shrink-0">
+          className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white shrink-0">
           <option value="high">🔴 High</option>
-          <option value="medium">🟡 Medium</option>
+          <option value="medium">🟡 Med</option>
           <option value="low">🟢 Low</option>
         </select>
 
-        {/* Due date picker */}
         <input ref={dueDateRef} type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="sr-only" tabIndex={-1} />
-        <div
-          onClick={() => dueDateRef.current?.showPicker?.()}
-          className={`shrink-0 flex items-center gap-1.5 border rounded-lg px-2.5 py-2 text-xs cursor-pointer transition whitespace-nowrap ${
-            dueDate ? 'border-blue-300 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-400 hover:border-gray-300 bg-white'
-          }`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div onClick={() => dueDateRef.current?.showPicker?.()}
+          className={`shrink-0 flex items-center gap-1 border rounded-lg px-2 py-1.5 text-xs cursor-pointer transition ${
+            dueDate ? 'border-blue-300 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-400 hover:border-gray-300'
+          }`}>
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          {dueDate ? formatDate(dueDate) : 'Due date'}
-          {dueDate && (
-            <span onClick={e => { e.stopPropagation(); setDueDate('') }}
-              className="ml-0.5 text-blue-400 hover:text-blue-700 font-bold leading-none">×</span>
-          )}
+          {dueDate ? formatDate(dueDate) : 'Date'}
+          {dueDate && <span onClick={e => { e.stopPropagation(); setDueDate('') }} className="ml-1 text-blue-400 hover:text-blue-700 font-bold">×</span>}
         </div>
 
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={e => setInput(e.target.value)}
+        <input ref={inputRef} type="text" value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addTask()}
-          placeholder="Add a task… press Enter to save"
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 placeholder-gray-300"
-        />
+          placeholder="Add a task…"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 placeholder-gray-300 min-w-0" />
         <button onClick={addTask}
-          className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1">
+          className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition flex items-center">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
           </svg>
@@ -168,77 +241,57 @@ function TasksCard({ currentUser }) {
       </div>
 
       {/* Task list */}
-      <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1" style={{ maxHeight: '320px' }}>
         {filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-300">
-            <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex flex-col items-center justify-center py-10 text-gray-300">
+            <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <p className="text-sm">{filter === 'done' ? 'No completed tasks' : filter === 'pending' ? 'Nothing pending!' : 'No tasks yet'}</p>
+            <p className="text-xs">{filter === 'done' ? 'No completed tasks' : filter === 'pending' ? 'Nothing pending!' : 'No tasks yet'}</p>
           </div>
         )}
-
         {filtered.map(task => (
           <div key={task.id}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition group ${
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition group ${
               task.done ? 'bg-gray-50 border-gray-100' : 'bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm'
             }`}>
-            {/* Checkbox */}
             <button onClick={() => toggleDone(task.id)}
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
+              className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
                 task.done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 hover:border-blue-400'
-              }`}>
+              }`}
+              style={{ width: 18, height: 18 }}>
               {task.done && (
                 <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               )}
             </button>
-
-            {/* Priority dot */}
-            <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[task.priority]}`} />
-
-            {/* Text */}
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_DOT[task.priority]}`} />
             <div className="flex-1 min-w-0">
               {editId === task.id ? (
                 <div>
-                  <input
-                    autoFocus
-                    value={editText}
-                    onChange={e => setEditText(e.target.value)}
+                  <input autoFocus value={editText} onChange={e => setEditText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') saveEdit(task.id); if (e.key === 'Escape') setEditId(null) }}
-                    onBlur={() => { if (!suppressBlurRef.current) saveEdit(task.id); suppressBlurRef.current = false }}
-                    className="w-full text-sm border-b border-blue-400 focus:outline-none bg-transparent"
-                  />
+                    onBlur={() => { if (!suppressBlur.current) saveEdit(task.id); suppressBlur.current = false }}
+                    className="w-full text-sm border-b border-blue-400 focus:outline-none bg-transparent" />
                   <div className="flex items-center gap-2 mt-1">
-                    <input ref={editDueDateRef} type="date" value={editDueDate}
-                      onChange={e => setEditDueDate(e.target.value)} className="sr-only" tabIndex={-1} />
-                    <div
-                      onMouseDown={() => { suppressBlurRef.current = true }}
+                    <input ref={editDueDateRef} type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} className="sr-only" tabIndex={-1} />
+                    <div onMouseDown={() => { suppressBlur.current = true }}
                       onClick={() => editDueDateRef.current?.showPicker?.()}
                       className={`flex items-center gap-1 text-[10px] cursor-pointer px-1.5 py-0.5 rounded border transition ${
                         editDueDate ? 'border-blue-200 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-400 hover:border-gray-300 bg-gray-50'
-                      }`}
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
+                      }`}>
                       {editDueDate ? formatDate(editDueDate) : 'Set due date'}
                     </div>
                     {editDueDate && (
-                      <button
-                        onMouseDown={() => { suppressBlurRef.current = true }}
-                        onClick={() => setEditDueDate('')}
-                        className="text-[10px] text-gray-400 hover:text-red-500 transition"
-                      >Remove</button>
+                      <button onMouseDown={() => { suppressBlur.current = true }} onClick={() => setEditDueDate('')}
+                        className="text-[10px] text-gray-400 hover:text-red-500 transition">Remove</button>
                     )}
                   </div>
                 </div>
               ) : (
                 <>
-                  <span className={`text-sm ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                    {task.text}
-                  </span>
+                  <span className={`text-sm truncate block ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.text}</span>
                   {task.dueDate && (
                     <p className={`text-[10px] mt-0.5 font-medium ${dueDateStatus(task.dueDate, task.done).colorClass}`}>
                       {dueDateStatus(task.dueDate, task.done).label}
@@ -247,25 +300,19 @@ function TasksCard({ currentUser }) {
                 </>
               )}
             </div>
-
-            {/* Priority badge */}
-            <span className={`hidden sm:inline-flex shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${PRIORITY_STYLE[task.priority]}`}>
+            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium capitalize hidden sm:inline-flex ${PRIORITY_STYLE[task.priority]}`}>
               {task.priority}
             </span>
-
-            {/* Actions */}
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
               {!task.done && (
-                <button onClick={() => startEdit(task)}
-                  className="p-1 text-gray-400 hover:text-blue-500 rounded transition">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onClick={() => startEdit(task)} className="p-1 text-gray-400 hover:text-blue-500 rounded">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </button>
               )}
-              <button onClick={() => deleteTask(task.id)}
-                className="p-1 text-gray-400 hover:text-red-500 rounded transition">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button onClick={() => deleteTask(task.id)} className="p-1 text-gray-400 hover:text-red-500 rounded">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7M4 7h16m-5 0V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3" />
                 </svg>
               </button>
@@ -274,18 +321,16 @@ function TasksCard({ currentUser }) {
         ))}
       </div>
 
-      {/* Footer */}
+      {/* Footer progress */}
       {doneCount > 0 && (
-        <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-          <div className="flex-1 bg-gray-100 rounded-full h-1.5 mr-4">
-            <div
-              className="bg-emerald-500 h-1.5 rounded-full transition-all"
-              style={{ width: `${Math.round((doneCount / tasks.length) * 100)}%` }}
-            />
+        <div className="px-4 py-3 border-t border-gray-50 flex items-center gap-3">
+          <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+            <div className="bg-emerald-500 h-1.5 rounded-full transition-all"
+              style={{ width: `${Math.round((doneCount / tasks.length) * 100)}%` }} />
           </div>
-          <span className="text-xs text-gray-400 mr-3">{Math.round((doneCount / tasks.length) * 100)}%</span>
+          <span className="text-xs text-gray-400">{Math.round((doneCount / tasks.length) * 100)}%</span>
           <button onClick={clearDone} className="text-xs text-gray-400 hover:text-red-500 transition whitespace-nowrap">
-            Clear done ({doneCount})
+            Clear done
           </button>
         </div>
       )}
@@ -293,85 +338,38 @@ function TasksCard({ currentUser }) {
   )
 }
 
-// ── Module Summary Card ───────────────────────────────────────────────────────
-function TrendBadge({ count }) {
-  if (count == null) return null
-  if (count === 0) return <span className="text-[10px] text-gray-400 font-medium">no change this week</span>
+// ── Module Quick-Nav ──────────────────────────────────────────────────────────
+function QuickNavCard({ title, icon, iconBg, iconColor, stat, statLabel, onNavigate, comingSoon }) {
   return (
-    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
-      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-      </svg>
-      +{count} this week
-    </span>
-  )
-}
-
-function ModuleCard({ title, icon, iconBg, stats, onNavigate, comingSoon, loading, trend }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-      <div className="flex items-center justify-between px-5 pt-5 pb-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${iconBg}`}>
-            {icon}
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-gray-900">{title}</h3>
-            {!comingSoon && !loading && <TrendBadge count={trend} />}
-          </div>
-        </div>
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-4 flex items-center gap-4 ${comingSoon ? 'opacity-70' : 'hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group'}`}
+      onClick={!comingSoon ? onNavigate : undefined}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+        <svg className={`w-5 h-5 ${iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {icon}
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-800">{title}</p>
         {comingSoon ? (
-          <span className="text-[10px] font-semibold px-2 py-1 bg-gray-100 text-gray-400 rounded-full uppercase tracking-wide">
-            Soon
-          </span>
+          <p className="text-xs text-gray-400">Coming soon</p>
+        ) : stat != null ? (
+          <p className="text-xs text-gray-400">{stat} {statLabel}</p>
         ) : (
-          onNavigate && (
-            <button onClick={onNavigate}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition shrink-0">
-              Open
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          )
+          <div className="w-10 h-3 bg-gray-100 rounded animate-pulse mt-0.5" />
         )}
       </div>
-
-      <div className="px-5 pb-5 flex-1">
-        {comingSoon ? (
-          <div className="flex flex-col items-center justify-center py-6 text-gray-300">
-            <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-xs text-gray-400">Coming Soon</p>
-          </div>
-        ) : loading ? (
-          <div className="flex items-center justify-center py-6">
-            <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            {stats.map(({ label, value, accent }) => (
-              <div key={label} className={`rounded-xl p-3 ${accent || 'bg-gray-50'}`}>
-                <p className="text-xl font-bold text-gray-900">{value ?? '—'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {comingSoon ? (
+        <span className="text-[10px] font-semibold px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full uppercase tracking-wide shrink-0">Soon</span>
+      ) : (
+        <svg className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      )}
     </div>
   )
 }
 
-// ── Greeting helper ───────────────────────────────────────────────────────────
-function greeting(name) {
-  const h = new Date().getHours()
-  const salutation = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
-  return `${salutation}, ${name.split(' ')[0]}`
-}
-
-// ── Main Dashboard Page ───────────────────────────────────────────────────────
+// ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function DashboardPage({ currentUser, company, setActivePage }) {
   const [inquiryStats, setInquiryStats]   = useState(null)
   const [masterStats, setMasterStats]     = useState(null)
@@ -380,7 +378,7 @@ export default function DashboardPage({ currentUser, company, setActivePage }) {
   const [loadingMasters, setLoadingMasters]     = useState(true)
   const [loadingEstimates, setLoadingEstimates] = useState(true)
 
-  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+  const weekAgo    = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
   const weekAgoISO = weekAgo.toISOString()
 
   useEffect(() => {
@@ -438,146 +436,109 @@ export default function DashboardPage({ currentUser, company, setActivePage }) {
   const tz    = now.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop()
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{greeting(currentUser.name)} 👋</h1>
-        <p className="text-gray-400 text-sm mt-0.5">{today} · {tz} · {company}</p>
+    <div className="p-6 space-y-5">
+
+      {/* Greeting */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{greeting(currentUser.name)}</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{today} · {tz} · {company.split(' ').slice(-1)[0]}</p>
+        </div>
       </div>
 
-      {/* Top row: Tasks + Quick overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Tasks — spans 2 cols */}
+      {/* KPI stat row */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Inquiries"
+          value={inquiryStats?.total}
+          loading={loadingInquiries}
+          thisWeek={inquiryStats?.thisWeek}
+          onClick={() => setActivePage('inquiries')}
+          iconBg="bg-blue-50"
+          iconColor="text-blue-600"
+          icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
+        />
+        <StatCard
+          label="Active Inquiries"
+          value={inquiryStats?.active}
+          loading={loadingInquiries}
+          onClick={() => setActivePage('inquiries')}
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
+          icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />}
+        />
+        <StatCard
+          label="Estimates"
+          value={estimateStats?.total}
+          loading={loadingEstimates}
+          thisWeek={estimateStats?.thisWeek}
+          onClick={() => setActivePage('erp-estimates')}
+          iconBg="bg-teal-50"
+          iconColor="text-teal-600"
+          icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+        />
+        <StatCard
+          label="Customers"
+          value={masterStats?.customers}
+          loading={loadingMasters}
+          onClick={() => setActivePage('masters-customers')}
+          iconBg="bg-violet-50"
+          iconColor="text-violet-600"
+          icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />}
+        />
+      </div>
+
+      {/* Pipeline + Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5" style={{ minHeight: '340px' }}>
+        <div className="lg:col-span-3">
+          <PipelinePanel
+            stats={inquiryStats}
+            loading={loadingInquiries}
+            onNavigate={() => setActivePage('inquiries')}
+          />
+        </div>
         <div className="lg:col-span-2">
           <TasksCard currentUser={currentUser} />
         </div>
-
-        {/* Inquiry quick-stat */}
-        <div className="flex flex-col gap-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-50">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Inquiry Snapshot</h3>
-                <p className="text-xs text-gray-400">{company.split(' ').slice(-1)[0]}</p>
-              </div>
-            </div>
-            {loadingInquiries ? (
-              <div className="flex justify-center py-4">
-                <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {[
-                  { label: 'Total', value: inquiryStats?.total ?? 0, bar: 1, color: 'bg-blue-500' },
-                  { label: 'Active', value: inquiryStats?.active ?? 0, bar: inquiryStats?.total ? inquiryStats.active / inquiryStats.total : 0, color: 'bg-emerald-500' },
-                  { label: 'Leads', value: inquiryStats?.leads ?? 0, bar: inquiryStats?.total ? inquiryStats.leads / inquiryStats.total : 0, color: 'bg-amber-500' },
-                  { label: 'Prospects', value: inquiryStats?.prospects ?? 0, bar: inquiryStats?.total ? inquiryStats.prospects / inquiryStats.total : 0, color: 'bg-purple-500' },
-                ].map(({ label, value, bar, color }) => (
-                  <div key={label}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-500">{label}</span>
-                      <span className="font-semibold text-gray-800">{value}</span>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${Math.round(bar * 100)}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button onClick={() => setActivePage('inquiries')}
-              className="mt-4 w-full text-xs text-blue-600 hover:text-blue-700 font-medium text-center transition">
-              View all inquiries →
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Module summary cards */}
+      {/* Module quick-nav */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Module Overview</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
-          {/* Inquiries */}
-          <ModuleCard
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Modules</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <QuickNavCard
             title="Inquiries"
-            iconBg="bg-blue-50"
-            loading={loadingInquiries}
-            trend={inquiryStats?.thisWeek}
+            iconBg="bg-blue-50" iconColor="text-blue-600"
+            icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
+            stat={inquiryStats?.total}
+            statLabel="total"
             onNavigate={() => setActivePage('inquiries')}
-            icon={
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
-              </svg>
-            }
-            stats={[
-              { label: 'Total', value: inquiryStats?.total, accent: 'bg-blue-50' },
-              { label: 'Active', value: inquiryStats?.active, accent: 'bg-emerald-50' },
-              { label: 'Leads', value: inquiryStats?.leads, accent: 'bg-amber-50' },
-              { label: 'Prospects', value: inquiryStats?.prospects, accent: 'bg-purple-50' },
-            ]}
           />
-
-          {/* Masters */}
-          <ModuleCard
+          <QuickNavCard
             title="Masters"
-            iconBg="bg-indigo-50"
-            loading={loadingMasters}
-            trend={masterStats?.thisWeek}
+            iconBg="bg-indigo-50" iconColor="text-indigo-600"
+            icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />}
+            stat={masterStats?.customers != null ? `${masterStats.customers} customers · ${masterStats.vendors} suppliers` : null}
+            statLabel=""
             onNavigate={() => setActivePage('masters')}
-            icon={
-              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-              </svg>
-            }
-            stats={[
-              { label: 'Customers', value: masterStats?.customers, accent: 'bg-blue-50' },
-              { label: 'Vendors', value: masterStats?.vendors, accent: 'bg-indigo-50' },
-              { label: 'Products', value: masterStats?.products, accent: 'bg-violet-50' },
-              { label: 'Storage', value: masterStats?.storage, accent: 'bg-slate-50' },
-            ]}
           />
-
-          {/* ERP / Estimates */}
-          <ModuleCard
+          <QuickNavCard
             title="ERP · Estimates"
-            iconBg="bg-teal-50"
-            loading={loadingEstimates}
-            trend={estimateStats?.thisWeek}
+            iconBg="bg-teal-50" iconColor="text-teal-600"
+            icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+            stat={estimateStats?.total}
+            statLabel={`total · ${estimateStats?.draft ?? '—'} draft`}
             onNavigate={() => setActivePage('erp-estimates')}
-            icon={
-              <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            }
-            stats={[
-              { label: 'Total', value: estimateStats?.total, accent: 'bg-teal-50' },
-              { label: 'Draft', value: estimateStats?.draft, accent: 'bg-gray-50' },
-              { label: 'Sent', value: estimateStats?.sent, accent: 'bg-blue-50' },
-              { label: 'Accepted', value: estimateStats?.accepted, accent: 'bg-emerald-50' },
-            ]}
           />
-
-          {/* WMS */}
-          <ModuleCard
+          <QuickNavCard
             title="WMS"
-            iconBg="bg-orange-50"
+            iconBg="bg-orange-50" iconColor="text-orange-500"
+            icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" />}
             comingSoon
-            icon={
-              <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7" />
-              </svg>
-            }
-            stats={[]}
           />
-
         </div>
       </div>
+
     </div>
   )
 }

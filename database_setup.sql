@@ -220,3 +220,8 @@ alter table notifications disable row level security;
 -- Enable realtime for notifications (required for live updates)
 -- Run separately if the above already exists:
 -- alter publication supabase_realtime add table notifications;
+
+-- ============================================================
+-- Company Master – add separate wire routing column
+-- ============================================================
+alter table company_master add column if not exists bank_routing_wire text;

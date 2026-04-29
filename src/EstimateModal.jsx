@@ -263,11 +263,12 @@ export async function generateEstimatePDF(data) {
     const qty = parseFloat(item.qty) || 0
     const up  = parseFloat(item.unitPrice) || 0
     const tot = qty * up
+    const isCharge = item.type === 'charge'
 
     const descLines = doc.splitTextToSize(item.description || '', cw[1] - 4)
     const mainH     = Math.max(10, descLines.length * 4.5 + 5)
 
-    const subFields = [
+    const subFields = isCharge ? [] : [
       item.ndcCode      && ['NDC/MA',       item.ndcCode],
       item.packSize     && ['Pack Size',    item.packSize],
       item.manufacturer && ['Manufacturer', item.manufacturer],
@@ -284,8 +285,12 @@ export async function generateEstimatePDF(data) {
       doc.addPage(); ry = 16; drawTableHeader(ry); ry += thH
     }
 
-    // Zebra striping — white / light steel grey
-    doc.setFillColor(...(idx % 2 === 0 ? [255, 255, 255] : [243, 245, 249]))
+    // Zebra striping — white / light steel grey; charge rows get a subtle cool tint
+    if (isCharge) {
+      doc.setFillColor(240, 244, 250)
+    } else {
+      doc.setFillColor(...(idx % 2 === 0 ? [255, 255, 255] : [243, 245, 249]))
+    }
     doc.rect(lm, ry, uw, mainH, 'F')
 
     const midY = ry + mainH / 2 + 1.5
@@ -301,14 +306,22 @@ export async function generateEstimatePDF(data) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DARK)
     let dy = ry + 4.5
     descLines.forEach(ln => { doc.text(ln, c2x + 2, dy); dy += 4.5 })
-    if (item.item) {
+
+    if (!isCharge && item.item) {
       doc.setFontSize(6.5); doc.setTextColor(...GRAY)
       doc.text(item.item, c2x + 2, dy)
     }
 
     doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DARK)
-    doc.text(String(item.qty || ''), c3x + cw[2] / 2, midY, { align: 'center' })
-    doc.text(item.um || '',          c4x + cw[3] / 2, midY, { align: 'center' })
+    if (isCharge) {
+      doc.setTextColor(...GRAY)
+      doc.text('—', c3x + cw[2] / 2, midY, { align: 'center' })
+      doc.text('—', c4x + cw[3] / 2, midY, { align: 'center' })
+      doc.setTextColor(...DARK)
+    } else {
+      doc.text(String(item.qty || ''), c3x + cw[2] / 2, midY, { align: 'center' })
+      doc.text(item.um || '',          c4x + cw[3] / 2, midY, { align: 'center' })
+    }
 
     const upStr  = up  > 0 ? `${item.currency} ${up.toFixed(2)}`  : '—'
     doc.text(upStr,  c6x - 2,    midY, { align: 'right' })
@@ -431,7 +444,6 @@ function ModeToggle({ mode, onChange }) {
 }
 
 export default function EstimateModal({ open, onClose, selectedInquiries = [], currentUser, company, masterCustomers = [], masterProducts = [] }) {
-  console.log('[EstimateModal] company prop:', company, '→ resolved key:', resolveCompany(company))
 
   const estNum = useRef(generateEstimateNumber())
   const validTillRef = useRef(null)
@@ -500,10 +512,10 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     setPoNo(''); setPayTermsMode('pick'); setPayTerms('Net 30'); setPayTermsManual('')
     setValidTill(''); setIncotermsMode('pick'); setIncoterms('ExW'); setIncotermsManual('')
     setNote('')
-    setBankOpen(true)
+    setBankOpen(false)
     setToast(null)
 
-    // Load company profile from DB, fall back to hardcoded config
+    // Load company profile strictly from DB — no hardcoded fallback for bank details
     const cfg = COMPANY_CONFIG[resolveCompany(company)]
     const companyKey = resolveCompany(company)
     supabase.from('company_master').select('*').then(({ data: cmRows }) => {
@@ -512,26 +524,18 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
         const addrParts = [cm.address1, cm.address2, cm.city, cm.state, cm.postal_code, cm.country].filter(Boolean)
         setCoAddress(addrParts.join(', '))
         setCoWebsite([cm.website, cm.phone].filter(Boolean).join(' | '))
-        setBankBeneficiary(cm.bank_account_name || cfg.bank.beneficiary)
-        setBankName(cm.bank_name || cfg.bank.bank)
-        setBankAddr(cm.bank_address || cfg.bank.address)
-        setBankAccount(cm.bank_account_number || cfg.bank.account)
-        setBankRoutingACH(cm.bank_routing_number || cfg.bank.routingACH)
-        setBankRoutingWire(cm.bank_routing_number || cfg.bank.routingWire)
-        setBankSwift(cm.bank_swift || cfg.bank.swift)
-        setBankIban(cm.bank_iban || cfg.bank.iban)
       } else {
         setCoAddress(cfg.address)
         setCoWebsite(cfg.website)
-        setBankBeneficiary(cfg.bank.beneficiary)
-        setBankName(cfg.bank.bank)
-        setBankAddr(cfg.bank.address)
-        setBankAccount(cfg.bank.account)
-        setBankRoutingACH(cfg.bank.routingACH)
-        setBankRoutingWire(cfg.bank.routingWire)
-        setBankSwift(cfg.bank.swift)
-        setBankIban(cfg.bank.iban)
       }
+      setBankBeneficiary(cm?.bank_account_name || '')
+      setBankName(cm?.bank_name || '')
+      setBankAddr(cm?.bank_address || '')
+      setBankAccount(cm?.bank_account_number || '')
+      setBankRoutingACH(cm?.bank_routing_number || '')
+      setBankRoutingWire(cm?.bank_routing_wire || '')
+      setBankSwift(cm?.bank_swift || '')
+      setBankIban(cm?.bank_iban || '')
     })
 
     setLineItems(
@@ -539,6 +543,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
         const prod = masterProducts.find(p => p.name === inq.product)
         return {
           _key: `${inq.id}-${i}`,
+          type: 'product',
           item: prod?.product_code || `US-${String(i + 1).padStart(2, '0')}`,
           description: inq.product || '',
           ndcCode: inq.ndc_ma_code || prod?.ndc_ma_code || '',
@@ -591,11 +596,19 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     setLineItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it))
   }
 
-  function addItem() {
+  function addProductRow() {
     setLineItems(prev => [...prev, {
-      _key: `extra-${Date.now()}`,
+      _key: `extra-${Date.now()}`, type: 'product',
       item: '', description: '', ndcCode: '', packSize: '', manufacturer: '', batchNo: '', expiry: '', htsCode: '',
       qty: '', um: 'ea', unitPrice: '', currency: primaryCurrency,
+    }])
+  }
+
+  function addChargeRow() {
+    setLineItems(prev => [...prev, {
+      _key: `charge-${Date.now()}`, type: 'charge',
+      item: '', description: '', ndcCode: '', packSize: '', manufacturer: '', batchNo: '', expiry: '', htsCode: '',
+      qty: '1', um: '', unitPrice: '', currency: primaryCurrency,
     }])
   }
 
@@ -702,43 +715,18 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                 <p className="text-sm font-bold text-gray-800 mt-0.5">{coName}</p>
               </div>
               <div className="p-4">
-                {coKey === 'Inc' ? (
+                {coMissingAddress ? (
+                  <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-xs text-amber-800 bg-amber-50 border border-amber-200">
+                    <svg className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    Company address not configured — go to Masters → Company Master to set it up.
+                  </div>
+                ) : (
                   <div className="space-y-1">
                     <p className="text-sm text-gray-700">{coAddress}</p>
                     {coWebsite && <p className="text-sm text-gray-400">{coWebsite}</p>}
                   </div>
-                ) : (
-                  <>
-                    {coMissingAddress && (
-                      <div className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg text-xs text-amber-800 bg-amber-50 border border-amber-200">
-                        <svg className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                        </svg>
-                        Company address not configured for this entity — please fill in before generating.
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 mb-1">Company Address</p>
-                        <textarea
-                          value={coAddress}
-                          onChange={e => setCoAddress(e.target.value)}
-                          placeholder="Enter company address…"
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 mb-1">Website / Phone</p>
-                        <input
-                          value={coWebsite}
-                          onChange={e => setCoWebsite(e.target.value)}
-                          placeholder="e.g. www.example.com | +1 000 000 0000"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                  </>
                 )}
               </div>
             </section>
@@ -866,7 +854,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
               </div>
             </section>
 
-            {/* ── Bank Details (collapsible) ── */}
+            {/* ── Bank Details (read-only, from Company Master) ── */}
             <section className="rounded-xl border border-gray-200 overflow-hidden">
               <button
                 type="button"
@@ -882,27 +870,33 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                 </svg>
               </button>
               {bankOpen && (
-                <div className="p-4 grid grid-cols-2 gap-3">
-                  {[
-                    ['Beneficiary Name', bankBeneficiary, setBankBeneficiary],
-                    ['Bank Name',        bankName,        setBankName],
-                    ['Bank Address',     bankAddr,        setBankAddr],
-                    ['Account Number',   bankAccount,     setBankAccount],
-                    ['Routing ACH',      bankRoutingACH,  setBankRoutingACH],
-                    ['Routing Wire',     bankRoutingWire, setBankRoutingWire],
-                    ['SWIFT',            bankSwift,       setBankSwift],
-                    ['IBAN',             bankIban,        setBankIban],
-                  ].map(([label, val, setter]) => (
-                    <div key={label}>
-                      <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
-                      <input
-                        value={val}
-                        onChange={e => setter(e.target.value)}
-                        placeholder={label}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                <div className="p-4">
+                  {!bankBeneficiary && !bankAccount ? (
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-xs text-amber-800 bg-amber-50 border border-amber-200">
+                      <svg className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      </svg>
+                      Bank details not configured — go to Masters → Company Master to set them up.
                     </div>
-                  ))}
+                  ) : (
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                      {[
+                        ['Beneficiary Name', bankBeneficiary],
+                        ['Bank Name',        bankName],
+                        ['Bank Address',     bankAddr],
+                        ['Account Number',   bankAccount],
+                        ['Routing ACH',      bankRoutingACH],
+                        ['Routing Wire',     bankRoutingWire],
+                        ['SWIFT',            bankSwift],
+                        ['IBAN',             bankIban],
+                      ].map(([label, val]) => val ? (
+                        <div key={label} className="flex gap-2 items-baseline">
+                          <span className="text-xs font-medium text-gray-400 w-32 shrink-0">{label}</span>
+                          <span className="text-sm text-gray-700">{val}</span>
+                        </div>
+                      ) : null)}
+                    </div>
+                  )}
                 </div>
               )}
             </section>
@@ -913,13 +907,22 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Line Items <span className="text-gray-300 normal-case font-normal ml-1">({lineItems.length})</span>
                 </p>
-                <button type="button" onClick={addItem}
-                  className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add row
-                </button>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={addProductRow}
+                    className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium transition">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add product
+                  </button>
+                  <button type="button" onClick={addChargeRow}
+                    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 font-medium transition">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add charge
+                  </button>
+                </div>
               </div>
 
               <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -940,33 +943,48 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                       const qty = parseFloat(item.qty) || 0
                       const up  = parseFloat(item.unitPrice) || 0
                       const tot = qty * up
+                      const isCharge = item.type === 'charge'
+                      const rowBg = isCharge
+                        ? 'bg-slate-100/60'
+                        : (idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60')
                       return (
-                        <tr key={item._key} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                        <tr key={item._key} className={rowBg}>
                           <td className="px-2 py-2 border-t border-gray-100 align-top">
-                            <input value={item.item} onChange={e => updateItem(idx, 'item', e.target.value)}
-                              className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                            {isCharge ? (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-500 uppercase tracking-wide">Charge</span>
+                            ) : (
+                              <input value={item.item} onChange={e => updateItem(idx, 'item', e.target.value)}
+                                className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                            )}
                           </td>
                           <td className="px-2 py-2 border-t border-gray-100 align-top">
                             <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)}
-                              className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 mb-1.5" />
-                            <div className="grid grid-cols-3 gap-1">
-                              {[['ndcCode','NDC#'],['packSize','Pack Size'],['manufacturer','Manufacturer'],['batchNo','Batch#'],['expiry','Expiry'],['htsCode','HTS Code']].map(([f, ph]) => (
-                                <input key={f} value={item[f]} onChange={e => updateItem(idx, f, e.target.value)}
-                                  placeholder={ph}
-                                  className="px-1.5 py-0.5 border border-gray-100 rounded text-[10px] text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-gray-50/70" />
-                              ))}
-                            </div>
+                              className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                            {!isCharge && (
+                              <div className="grid grid-cols-3 gap-1 mt-1.5">
+                                {[['ndcCode','NDC#'],['packSize','Pack Size'],['manufacturer','Manufacturer'],['batchNo','Batch#'],['expiry','Expiry'],['htsCode','HTS Code']].map(([f, ph]) => (
+                                  <input key={f} value={item[f]} onChange={e => updateItem(idx, f, e.target.value)}
+                                    placeholder={ph}
+                                    className="px-1.5 py-0.5 border border-gray-100 rounded text-[10px] text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-gray-50/70" />
+                                ))}
+                              </div>
+                            )}
                           </td>
-                          <td className="px-2 py-2 border-t border-gray-100 align-top">
-                            <input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)}
-                              className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                          <td className="px-2 py-2 border-t border-gray-100 align-top text-center text-gray-400 text-xs">
+                            {isCharge ? '—' : (
+                              <input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)}
+                                className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                            )}
                           </td>
-                          <td className="px-2 py-2 border-t border-gray-100 align-top">
-                            <input value={item.um} onChange={e => updateItem(idx, 'um', e.target.value)}
-                              className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                          <td className="px-2 py-2 border-t border-gray-100 align-top text-center text-gray-400 text-xs">
+                            {isCharge ? '—' : (
+                              <input value={item.um} onChange={e => updateItem(idx, 'um', e.target.value)}
+                                className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                            )}
                           </td>
                           <td className="px-2 py-2 border-t border-gray-100 align-top">
                             <input value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)}
+                              placeholder={isCharge ? 'Amount' : ''}
                               className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400" />
                           </td>
                           <td className="px-3 py-2 border-t border-gray-100 text-right align-top font-medium text-gray-700">
