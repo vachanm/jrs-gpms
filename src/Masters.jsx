@@ -2704,6 +2704,7 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
   const [sortDir, setSortDir]         = useState('desc')
   const [importFile, setImportFile]   = useState(null)
   const [fixingCodes, setFixingCodes] = useState(false)
+  const hasBrokenCodes = entries.some(r => !r.product_code || /^PRD-\d+$/.test(r.product_code))
   const firstInputRef                 = useRef(null)
   const importFileRef                 = useRef(null)
 
@@ -2855,7 +2856,7 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
             Report
           </button>
           )}
-          {isAdmin && (
+          {isAdmin && hasBrokenCodes && (
           <button onClick={bulkFixCodes} disabled={fixingCodes}
             className="flex items-center gap-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-60 text-amber-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
