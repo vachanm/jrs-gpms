@@ -106,3 +106,19 @@ Create a `.env` file (not committed):
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
+
+## SQL Migrations
+
+All schema changes (new tables, column additions, index creation, RLS changes, etc.) must be appended to `migrations.sql` at the project root **every time** a SQL command is provided or executed — no exceptions.
+
+Format to follow when appending:
+```sql
+-- <feature name> (<date>)
+CREATE TABLE ...;
+```
+
+On release day (merging `dev` → `main`):
+1. Run only the **new statements** added since the last release in the **production** Supabase SQL Editor.
+2. Then merge `dev` → `main` and push.
+
+The `dev` branch preview deployment points to a **staging Supabase**; `main` points to **production Supabase**. These are separate projects — schema changes do not carry over automatically.
