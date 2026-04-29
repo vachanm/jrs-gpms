@@ -2703,8 +2703,24 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
   const [sortField, setSortField]     = useState('created_at')
   const [sortDir, setSortDir]         = useState('desc')
   const [importFile, setImportFile]   = useState(null)
+  const [fixingCodes, setFixingCodes] = useState(false)
   const firstInputRef                 = useRef(null)
   const importFileRef                 = useRef(null)
+
+  async function bulkFixCodes() {
+    setFixingCodes(true)
+    const { data: all } = await supabase.from('products_master').select('id, product_code, country_of_origin, material_type').eq('company', company)
+    const broken = (all || []).filter(r => !r.product_code || /^PRD-\d+$/.test(r.product_code))
+    let fixed = 0
+    for (const row of broken) {
+      const newCode = await generateProductCode(row.country_of_origin, row.material_type, company)
+      await supabase.from('products_master').update({ product_code: newCode }).eq('id', row.id)
+      fixed++
+    }
+    setFixingCodes(false)
+    showToast(fixed > 0 ? `Fixed ${fixed} product code${fixed !== 1 ? 's' : ''}` : 'No codes needed fixing', fixed > 0 ? 'success' : 'info')
+    if (fixed > 0) fetchEntries()
+  }
 
   function toggleSort(f) {
     if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -2837,6 +2853,13 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
             className="flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Report
+          </button>
+          )}
+          {isAdmin && (
+          <button onClick={bulkFixCodes} disabled={fixingCodes}
+            className="flex items-center gap-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-60 text-amber-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            {fixingCodes ? 'Fixing…' : 'Fix Codes'}
           </button>
           )}
           <button onClick={openAdd}
