@@ -2718,9 +2718,9 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
       await supabase.from('products_master').update({ product_code: newCode }).eq('id', row.id)
       fixed++
     }
+    if (fixed > 0) await fetchEntries()
     setFixingCodes(false)
     showToast(fixed > 0 ? `Fixed ${fixed} product code${fixed !== 1 ? 's' : ''}` : 'No codes needed fixing', fixed > 0 ? 'success' : 'info')
-    if (fixed > 0) fetchEntries()
   }
 
   function toggleSort(f) {
