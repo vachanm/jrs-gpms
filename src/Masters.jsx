@@ -481,10 +481,10 @@ const UNITS_OF_MEASUREMENT = [
   { label: 'Packs',           code: 'pack' },
 ]
 
-async function nextSeqNum(table, codeField, prefix, company) {
+async function nextSeqNum(table, codeField, prefix, company, pendingCodes = []) {
   const { data } = await supabase.from(table).select(codeField).eq('company', company)
   const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\d+)$`)
-  const nums = (data || []).map(r => r[codeField]).filter(Boolean)
+  const nums = [...(data || []).map(r => r[codeField]), ...pendingCodes].filter(Boolean)
     .map(c => { const m = c.match(re); return m ? parseInt(m[1], 10) : null }).filter(n => n !== null)
   return nums.length > 0 ? Math.max(...nums) + 1 : 10001
 }
@@ -503,14 +503,14 @@ async function generateSupplierCode(country, company) {
   return `${prefix} ${seq}`
 }
 
-async function generateProductCode(country, materialType, company) {
+async function generateProductCode(country, materialType, company, pendingCodes = []) {
   const normalized = COUNTRIES.find(c => c.toLowerCase() === (country || '').toLowerCase().trim()) || country || ''
   const { data } = await supabase.from('code_formats').select('prefix').eq('type', 'product').eq('country', normalized).eq('company', company).maybeSingle()
   const iso = data?.prefix || COUNTRY_ISO2[normalized] || 'XX'
   const mt = MATERIAL_TYPES.find(m => m.label === materialType)
   const typeCode = mt ? mt.code : 'PR'
   const prefix = `${iso}${typeCode}`
-  const seq = await nextSeqNum('products_master', 'product_code', prefix, company)
+  const seq = await nextSeqNum('products_master', 'product_code', prefix, company, pendingCodes)
   return `${prefix} ${seq}`
 }
 
@@ -795,8 +795,11 @@ function MasterImportModal({ file, tableKey, company, onClose, onImported }) {
     if (cfg.codeField) {
       if (tableKey === 'products_master') {
         const rows = []
+        const assignedCodes = []
         for (const row of toInsert) {
-          rows.push({ ...row, product_code: await generateProductCode(row.country_of_origin, row.material_type, company) })
+          const code = await generateProductCode(row.country_of_origin, row.material_type, company, assignedCodes)
+          assignedCodes.push(code)
+          rows.push({ ...row, product_code: code })
         }
         toInsert = rows
       } else {
@@ -2704,17 +2707,33 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
   const [sortDir, setSortDir]         = useState('desc')
   const [importFile, setImportFile]   = useState(null)
   const [fixingCodes, setFixingCodes] = useState(false)
-  const hasBrokenCodes = entries.some(r => !r.product_code || /^PRD-\d+$/.test(r.product_code))
+  const hasBrokenCodes = (() => {
+    const seen = new Set()
+    return entries.some(r => {
+      if (!r.product_code || /^PRD-\d+$/.test(r.product_code)) return true
+      if (seen.has(r.product_code)) return true
+      seen.add(r.product_code)
+      return false
+    })
+  })()
   const firstInputRef                 = useRef(null)
   const importFileRef                 = useRef(null)
 
   async function bulkFixCodes() {
     setFixingCodes(true)
     const { data: all } = await supabase.from('products_master').select('id, product_code, country_of_origin, material_type').eq('company', company)
-    const broken = (all || []).filter(r => !r.product_code || /^PRD-\d+$/.test(r.product_code))
+    const seenCodes = new Set()
+    const broken = (all || []).filter(r => {
+      if (!r.product_code || /^PRD-\d+$/.test(r.product_code)) return true
+      if (seenCodes.has(r.product_code)) return true
+      seenCodes.add(r.product_code)
+      return false
+    })
     let fixed = 0
+    const assignedCodes = [...seenCodes]
     for (const row of broken) {
-      const newCode = await generateProductCode(row.country_of_origin, row.material_type, company)
+      const newCode = await generateProductCode(row.country_of_origin, row.material_type, company, assignedCodes)
+      assignedCodes.push(newCode)
       await supabase.from('products_master').update({ product_code: newCode }).eq('id', row.id)
       fixed++
     }
