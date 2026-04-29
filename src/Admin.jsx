@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from './supabase'
 import { logActivity } from './auditLogger'
 
-const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah']
+const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah', 'Vachan']
 
 const ACTION_LABELS = {
   created:                'Created',

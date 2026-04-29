@@ -7,7 +7,7 @@ import DashboardPage from './Dashboard'
 import AdminModule from './Admin'
 import { supabase } from './supabase'
 
-const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah']
+const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah', 'Vachan']
 
 const COMPANIES = [
   'Jupiter Research Services Inc',
