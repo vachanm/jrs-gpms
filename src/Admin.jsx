@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from './supabase'
+import { logActivity } from './auditLogger'
 
 const ADMIN_USERS = ['Mahendra Sannappa', 'Pratik Shah', 'Sanket Patel', 'Sachin Shah']
 
@@ -15,6 +16,7 @@ const ACTION_LABELS = {
   logout:                 'Logged Out',
   submitted_for_approval: 'Submitted for Approval',
   generated_estimate:     'Generated Estimate',
+  backup_created:         'Backup Downloaded',
 }
 
 const MODULE_COLORS = {
@@ -27,6 +29,7 @@ const MODULE_COLORS = {
   'Storage Master':  'bg-yellow-50 text-yellow-700',
   'Estimates':       'bg-emerald-50 text-emerald-700',
   'Session':         'bg-gray-100 text-gray-600',
+  'System':          'bg-teal-50 text-teal-700',
 }
 
 const ACTION_COLORS = {
@@ -40,6 +43,7 @@ const ACTION_COLORS = {
   logout:                 'text-gray-500',
   submitted_for_approval: 'text-orange-600',
   generated_estimate:     'text-purple-600',
+  backup_created:         'text-teal-600',
 }
 
 const PAGE_SIZE = 50
@@ -184,7 +188,7 @@ function ActivityLog() {
   useEffect(() => {
     async function load() {
       const { data } = await supabase.from('users').select('name').order('name')
-      setEmployeeList((data || []).filter(u => !ADMIN_USERS.includes(u.name)).map(u => u.name))
+      setEmployeeList((data || []).map(u => u.name))
     }
     load()
   }, [])
@@ -522,8 +526,149 @@ function ActivityLog() {
   )
 }
 
+// ── BackupTab ─────────────────────────────────────────────────────────────────
+function BackupTab({ company, currentUser }) {
+  const [counts, setCounts]           = useState({ inquiries: 0, customers: 0, vendors: 0, products: 0, storage: 0, estimates: 0, audit_logs: 0 })
+  const [loading, setLoading]         = useState(true)
+  const [downloading, setDownloading] = useState(false)
+  const [lastBackup, setLastBackup]   = useState(() => localStorage.getItem(`jrs_last_backup_${company}`) || null)
+
+  useEffect(() => {
+    setLastBackup(localStorage.getItem(`jrs_last_backup_${company}`) || null)
+    async function fetchCounts() {
+      setLoading(true)
+      const [inq, cust, vend, prod, stor, est, logs] = await Promise.all([
+        supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('company', company),
+        supabase.from('customers_master').select('*', { count: 'exact', head: true }).eq('company', company),
+        supabase.from('vendors_master').select('*', { count: 'exact', head: true }).eq('company', company),
+        supabase.from('products_master').select('*', { count: 'exact', head: true }).eq('company', company),
+        supabase.from('storage_master').select('*', { count: 'exact', head: true }).eq('company', company),
+        supabase.from('estimates').select('*', { count: 'exact', head: true }).eq('company', company),
+        supabase.from('audit_logs').select('*', { count: 'exact', head: true }),
+      ])
+      setCounts({
+        inquiries:  inq.count  || 0,
+        customers:  cust.count || 0,
+        vendors:    vend.count || 0,
+        products:   prod.count || 0,
+        storage:    stor.count || 0,
+        estimates:  est.count  || 0,
+        audit_logs: logs.count || 0,
+      })
+      setLoading(false)
+    }
+    fetchCounts()
+  }, [company])
+
+  async function handleDownload() {
+    setDownloading(true)
+    const [inq, cust, vend, prod, stor, est, logs] = await Promise.all([
+      supabase.from('inquiries').select('*').eq('company', company),
+      supabase.from('customers_master').select('*').eq('company', company),
+      supabase.from('vendors_master').select('*').eq('company', company),
+      supabase.from('products_master').select('*').eq('company', company),
+      supabase.from('storage_master').select('*').eq('company', company),
+      supabase.from('estimates').select('*').eq('company', company),
+      supabase.from('audit_logs').select('*').order('created_at', { ascending: false }),
+    ])
+    const wb = XLSX.utils.book_new()
+    const sheets = [
+      ['Inquiries',    inq.data],
+      ['Customers',    cust.data],
+      ['Vendors',      vend.data],
+      ['Products',     prod.data],
+      ['Storage',      stor.data],
+      ['Estimates',    est.data],
+      ['Activity Log', logs.data],
+    ]
+    for (const [name, rows] of sheets) {
+      if (rows?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name)
+    }
+    const dateTag     = new Date().toISOString().split('T')[0]
+    const safeCompany = company.replace(/[^a-zA-Z0-9]/g, '-')
+    XLSX.writeFile(wb, `JRS-Backup-${safeCompany}-${dateTag}.xlsx`)
+    const now = new Date().toISOString()
+    localStorage.setItem(`jrs_last_backup_${company}`, now)
+    setLastBackup(now)
+    logActivity({ actor: currentUser, company, module: 'System', action: 'backup_created', details: { tables: sheets.map(([n]) => n) } })
+    setDownloading(false)
+  }
+
+  const tableCards = [
+    { label: 'Inquiries',    key: 'inquiries',  color: 'bg-blue-50 text-blue-600' },
+    { label: 'Customers',    key: 'customers',  color: 'bg-purple-50 text-purple-600' },
+    { label: 'Vendors',      key: 'vendors',    color: 'bg-orange-50 text-orange-600' },
+    { label: 'Products',     key: 'products',   color: 'bg-pink-50 text-pink-600' },
+    { label: 'Storage',      key: 'storage',    color: 'bg-yellow-50 text-yellow-600' },
+    { label: 'Estimates',    key: 'estimates',  color: 'bg-emerald-50 text-emerald-600' },
+    { label: 'Activity Log', key: 'audit_logs', color: 'bg-teal-50 text-teal-600' },
+  ]
+
+  function formatLastBackup(iso) {
+    if (!iso) return 'Never'
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+      + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Info card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Data Backup</h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              Download a full snapshot of all data for <span className="font-medium text-gray-600">{company}</span> as a multi-sheet Excel file.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Record count cards */}
+      <div className="grid grid-cols-4 gap-4">
+        {tableCards.map(({ label, key, color }) => (
+          <div key={key} className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 4v16M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 font-medium">{label}</p>
+              <p className="text-xl font-bold text-gray-900">
+                {loading ? <span className="inline-block w-6 h-4 bg-gray-100 rounded animate-pulse" /> : counts[key].toLocaleString()}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Download section */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-6 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-700">Last backup</p>
+          <p className="text-sm text-gray-400 mt-0.5">{formatLastBackup(lastBackup)}</p>
+        </div>
+        <button onClick={handleDownload} disabled={downloading || loading}
+          className="flex items-center gap-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm">
+          {downloading
+            ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>}
+          {downloading ? 'Preparing…' : 'Download Backup (.xlsx)'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── AdminModule ───────────────────────────────────────────────────────────────
-export default function AdminModule({ company }) {
+export default function AdminModule({ company, currentUser }) {
   const [activeTab, setActiveTab] = useState('approvals')
   const [requests, setRequests]           = useState([])
   const [loading, setLoading]             = useState(true)
@@ -556,6 +701,7 @@ export default function AdminModule({ company }) {
       .update({ pending_approval: false, is_approved: true, approved_date: today })
       .eq('id', req.id)
     if (error) { showToast('Approval failed: ' + error.message, 'error'); return }
+    logActivity({ actor: currentUser, company, module: 'Customer Master', action: 'edited', recordLabel: req.name, details: { status: 'approved', submitted_by: req.submitted_by || '' } })
     if (req.submitted_by) {
       await supabase.from('notifications').insert({
         recipient_name: req.submitted_by,
@@ -573,6 +719,7 @@ export default function AdminModule({ company }) {
       .delete()
       .eq('id', req.id)
     if (error) { showToast('Reject failed: ' + error.message, 'error'); return }
+    logActivity({ actor: currentUser, company, module: 'Customer Master', action: 'deleted', recordLabel: req.name, details: { status: 'rejected', submitted_by: req.submitted_by || '' } })
     if (req.submitted_by) {
       await supabase.from('notifications').insert({
         recipient_name: req.submitted_by,
@@ -628,6 +775,12 @@ export default function AdminModule({ company }) {
             ${activeTab === 'activity' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           Activity Log
+        </button>
+        <button onClick={() => setActiveTab('backup')}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition
+            ${activeTab === 'backup' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          Backup
         </button>
       </div>
 
@@ -724,6 +877,9 @@ export default function AdminModule({ company }) {
 
       {/* Tab: Activity Log */}
       {activeTab === 'activity' && <ActivityLog />}
+
+      {/* Tab: Backup */}
+      {activeTab === 'backup' && <BackupTab company={company} currentUser={currentUser} />}
     </div>
   )
 }

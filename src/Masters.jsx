@@ -622,6 +622,8 @@ const EMPTY_CUSTOMER = {
   contact1_name: '', contact1_email: '', contact1_phone: '',
   contact2_name: '', contact2_email: '', contact2_phone: '',
   contact3_name: '', contact3_email: '', contact3_phone: '',
+  license_number: '',
+  license_validity: '',
   is_approved: false,
   approved_date: '',
   bank_name: '', bank_address: '', bank_account_name: '',
@@ -651,16 +653,21 @@ const MASTER_IMPORT_CONFIG = {
       { key: 'contact3_name',   label: 'Contact 3 Name',   required: false, aliases: ['contact 3 name'] },
       { key: 'contact3_email',  label: 'Contact 3 Email',  required: false, aliases: ['contact 3 email'] },
       { key: 'contact3_phone',  label: 'Contact 3 Phone',  required: false, aliases: ['contact 3 phone'] },
-      { key: 'approved_date',   label: 'Approved Date',    required: false, aliases: ['approved date', 'approval date'] },
-      { key: 'remarks',         label: 'Remarks',          required: false, aliases: ['remarks', 'notes', 'comments'] },
+      { key: 'license_number',   label: 'License Number',   required: false, aliases: ['license number', 'license no', 'licence no', 'licence number'] },
+      { key: 'license_validity', label: 'License Validity', required: false, aliases: ['license validity', 'licence validity', 'license expiry', 'licence expiry'] },
+      { key: 'approved_date',    label: 'Approved Date',    required: false, aliases: ['approved date', 'approval date'] },
+      { key: 'remarks',          label: 'Remarks',          required: false, aliases: ['remarks', 'notes', 'comments'] },
     ],
   },
   vendors_master: {
     label: 'Supplier', codeField: null,
     fields: [
       { key: 'name',           label: 'Name',             required: true,  aliases: ['name', 'supplier name', 'vendor name', 'vendor', 'supplier'] },
-      { key: 'address1',       label: 'Address 1',        required: false, aliases: ['address 1', 'address', 'addr 1', 'addr1'] },
-      { key: 'address2',       label: 'Address 2',        required: false, aliases: ['address 2', 'addr 2', 'addr2'] },
+      { key: 'bill_to_address', label: 'Address',           required: false, aliases: ['address', 'addr', 'street', 'building', 'address 1', 'addr1'] },
+      { key: 'bill_to_country', label: 'Country',           required: false, aliases: ['country'] },
+      { key: 'bill_to_state',   label: 'State / Province',  required: false, aliases: ['state', 'province'] },
+      { key: 'bill_to_city',    label: 'City',              required: false, aliases: ['city'] },
+      { key: 'bill_to_postal_code', label: 'Postal Code',   required: false, aliases: ['postal code', 'zip', 'postcode'] },
       { key: 'country',        label: 'Country',          required: false, aliases: ['country'] },
       { key: 'state',          label: 'State',            required: false, aliases: ['state', 'province'] },
       { key: 'postal_code',    label: 'Postal Code',      required: false, aliases: ['postal code', 'zip', 'postcode'] },
@@ -674,10 +681,11 @@ const MASTER_IMPORT_CONFIG = {
       { key: 'contact3_name',  label: 'Contact 3 Name',   required: false, aliases: ['contact 3 name'] },
       { key: 'contact3_email', label: 'Contact 3 Email',  required: false, aliases: ['contact 3 email'] },
       { key: 'contact3_phone', label: 'Contact 3 Phone',  required: false, aliases: ['contact 3 phone'] },
-      { key: 'approved_date',  label: 'Approved Date',    required: false, aliases: ['approved date', 'approval date'] },
-      { key: 'valid_through',  label: 'Valid Through',    required: false, aliases: ['valid through', 'valid till', 'expiry', 'expiry date'] },
-      { key: 'license_number', label: 'License Number',   required: false, aliases: ['license number', 'license no', 'licence no', 'licence number'] },
-      { key: 'remarks',        label: 'Remarks',          required: false, aliases: ['remarks', 'notes'] },
+      { key: 'approved_date',    label: 'Approved Date',    required: false, aliases: ['approved date', 'approval date'] },
+      { key: 'valid_through',    label: 'Valid Through',    required: false, aliases: ['valid through', 'valid till', 'expiry', 'expiry date'] },
+      { key: 'license_number',   label: 'License Number',   required: false, aliases: ['license number', 'license no', 'licence no', 'licence number'] },
+      { key: 'license_validity', label: 'License Validity', required: false, aliases: ['license validity', 'licence validity', 'license expiry', 'licence expiry'] },
+      { key: 'remarks',          label: 'Remarks',          required: false, aliases: ['remarks', 'notes'] },
     ],
   },
   products_master: {
@@ -754,7 +762,7 @@ function MasterImportModal({ file, tableKey, company, onClose, onImported }) {
     return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0]
   }
 
-  const DATE_FIELDS = ['approved_date', 'valid_through']
+  const DATE_FIELDS = ['approved_date', 'valid_through', 'license_validity']
 
   function buildPreview() {
     return rawRows.map(row => {
@@ -947,8 +955,10 @@ const CUSTOMER_REPORT_COLS = [
   { label: 'Ship City',         key: 'ship_to_city' },
   { label: 'Ship Postal',       key: 'ship_to_postal_code' },
   { label: 'Website',           key: 'website' },
-  { label: 'Valid Date',     key: 'valid_date',     format: 'date' },
-  { label: 'Approved',       key: 'is_approved' },
+  { label: 'Valid Date',        key: 'valid_date',        format: 'date' },
+  { label: 'License No.',       key: 'license_number' },
+  { label: 'License Validity',  key: 'license_validity',  format: 'date' },
+  { label: 'Approved',          key: 'is_approved' },
   { label: 'Approved Date',  key: 'approved_date',  format: 'date' },
   { label: 'Bank Name',      key: 'bank_name' },
   { label: 'Account No.',    key: 'bank_account_number' },
@@ -1112,7 +1122,7 @@ function AttachmentsModal({ entityId, entityType, entityName, company, currentUs
 // ── Code Format Section ───────────────────────────────────────────────────────
 const CODE_FORMAT_TABLE_CFG = {
   customer: { table: 'customers_master', codeField: 'customer_code', countryField: 'country' },
-  supplier: { table: 'vendors_master',   codeField: 'supplier_code', countryField: 'country' },
+  supplier: { table: 'vendors_master',   codeField: 'supplier_code', countryField: 'bill_to_country' },
   product:  { table: 'products_master',  codeField: 'product_code',  countryField: 'country_of_origin' },
 }
 
@@ -1629,11 +1639,13 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
                     { label: 'Ship To Address',   field: null },
                     { label: 'Website',           field: null },
                     { label: 'Contact 1 Name', field: null },
-                    { label: 'Contact 1 Email',field: null },
-                    { label: 'Contact 1 Phone',field: null },
-                    { label: 'Approved Date',  field: 'approved_date' },
-                    { label: 'Added',          field: 'created_at' },
-                    { label: 'Remarks',        field: null },
+                    { label: 'Contact 1 Email',   field: null },
+                    { label: 'Contact 1 Phone',   field: null },
+                    { label: 'License No.',       field: null },
+                    { label: 'License Validity',  field: 'license_validity' },
+                    { label: 'Approved Date',     field: 'approved_date' },
+                    { label: 'Added',             field: 'created_at' },
+                    { label: 'Remarks',           field: null },
                   ].map(({ label, field }) => (
                     <th key={label}
                       className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50 ${field ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
@@ -1683,6 +1695,8 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact1_name || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact1_email || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.contact1_phone || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.license_number || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.license_validity)}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.approved_date)}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.created_at)}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[160px]">
@@ -2000,6 +2014,18 @@ function CustomerSection({ company, showToast, isAdmin, currentUser, onAddInquir
                 </button>
               )}
 
+              {/* License */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="License Number">
+                  <input className={inputCls(false)} value={form.license_number} placeholder="e.g. LIC-2024-00123"
+                    onChange={e => setField('license_number', e.target.value)} />
+                </Field>
+                <Field label="License Validity">
+                  <input type="date" className={inputCls(false)} value={form.license_validity}
+                    onChange={e => setField('license_validity', e.target.value)} />
+                </Field>
+              </div>
+
               {/* Bank Details */}
               <div className="border border-gray-100 rounded-xl p-4 space-y-4">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Bank Details</p>
@@ -2053,32 +2079,36 @@ const EMPTY_SUPPLIER = {
   name: '',
   supplier_code: '',
   vat_number: '',
-  address1: '', address2: '',
-  country: '', state: '', postal_code: '',
+  bill_to_address: '',
+  bill_to_country: '', bill_to_state: '', bill_to_city: '', bill_to_postal_code: '',
   website: '',
   contact1_name: '', contact1_email: '', contact1_phone: '',
   contact2_name: '', contact2_email: '', contact2_phone: '',
   contact3_name: '', contact3_email: '', contact3_phone: '',
   approved_date: '', valid_through: '',
   license_number: '',
+  license_validity: '',
   remarks: '',
 }
 
 const SUPPLIER_REPORT_COLS = [
-  { label: 'Code',           key: 'supplier_code' },
-  { label: 'Name',           key: 'name' },
-  { label: 'VAT Number',     key: 'vat_number' },
-  { label: 'Country',        key: 'country' },
-  { label: 'State',          key: 'state' },
-  { label: 'Postal Code',    key: 'postal_code' },
-  { label: 'Website',        key: 'website' },
-  { label: 'License No.',    key: 'license_number' },
-  { label: 'Approved Date',  key: 'approved_date',  format: 'date' },
-  { label: 'Valid Through',  key: 'valid_through',  format: 'date' },
-  { label: 'Contact 1',      key: 'contact1_name' },
-  { label: 'Email 1',        key: 'contact1_email' },
-  { label: 'Phone 1',        key: 'contact1_phone' },
-  { label: 'Remarks',        key: 'remarks' },
+  { label: 'Code',             key: 'supplier_code' },
+  { label: 'Name',             key: 'name' },
+  { label: 'VAT Number',       key: 'vat_number' },
+  { label: 'Address',          key: 'bill_to_address' },
+  { label: 'Country',          key: 'bill_to_country' },
+  { label: 'State',            key: 'bill_to_state' },
+  { label: 'City',             key: 'bill_to_city' },
+  { label: 'Postal Code',      key: 'bill_to_postal_code' },
+  { label: 'Website',          key: 'website' },
+  { label: 'License No.',      key: 'license_number' },
+  { label: 'License Validity', key: 'license_validity', format: 'date' },
+  { label: 'Approved Date',    key: 'approved_date',    format: 'date' },
+  { label: 'Valid Through',    key: 'valid_through',    format: 'date' },
+  { label: 'Contact 1',        key: 'contact1_name' },
+  { label: 'Email 1',          key: 'contact1_email' },
+  { label: 'Phone 1',          key: 'contact1_phone' },
+  { label: 'Remarks',          key: 'remarks' },
 ]
 
 function SupplierSection({ company, showToast, currentUser }) {
@@ -2130,23 +2160,22 @@ function SupplierSection({ company, showToast, currentUser }) {
 
   function openEdit(entry) {
     setEditing(entry)
-    const presets = STATES_BY_COUNTRY[entry.country] || []
-    setFreeTextState(!!(entry.state && !presets.includes(entry.state)))
+    const presets = STATES_BY_COUNTRY[entry.bill_to_country] || []
+    setFreeTextState(!!(entry.bill_to_state && !presets.includes(entry.bill_to_state)))
     setForm(Object.fromEntries(Object.keys(EMPTY_SUPPLIER).map(k => [k, entry[k] || ''])))
     setErrors({})
     setVisibleContacts(entry.contact3_name ? 3 : entry.contact2_name ? 2 : 1)
     setShowForm(true)
   }
 
+  function handleCountryChange(val) {
+    setForm(prev => ({ ...prev, bill_to_country: val, bill_to_state: '' }))
+    setFreeTextState(false)
+  }
+
   function setField(key, val) {
     setForm(prev => ({ ...prev, [key]: val }))
     setErrors(prev => ({ ...prev, [key]: '' }))
-  }
-
-  function handleCountryChange(val) {
-    setForm(prev => ({ ...prev, country: val, state: '' }))
-    setFreeTextState(false)
-    setErrors(prev => ({ ...prev, country: '' }))
   }
 
   function validate() {
@@ -2166,7 +2195,7 @@ function SupplierSection({ company, showToast, currentUser }) {
       logActivity({ actor: currentUser, company, module: 'Vendors Master', action: 'edited', recordId: editing.id, recordLabel: form.name })
       showToast('Supplier updated')
     } else {
-      if (!payload.supplier_code) payload.supplier_code = await generateSupplierCode(form.country, company)
+      if (!payload.supplier_code) payload.supplier_code = await generateSupplierCode(form.bill_to_country, company)
       const { error } = await supabase.from('vendors_master').insert([payload])
       if (error) { showToast(error.message, 'error'); setSaving(false); return }
       logActivity({ actor: currentUser, company, module: 'Vendors Master', action: 'created', recordLabel: form.name })
@@ -2188,8 +2217,9 @@ function SupplierSection({ company, showToast, currentUser }) {
       const q = search.toLowerCase()
       return (
         e.name?.toLowerCase().includes(q) ||
-        e.country?.toLowerCase().includes(q) ||
-        e.state?.toLowerCase().includes(q) ||
+        e.bill_to_address?.toLowerCase().includes(q) ||
+        e.bill_to_country?.toLowerCase().includes(q) ||
+        e.bill_to_city?.toLowerCase().includes(q) ||
         e.contact1_name?.toLowerCase().includes(q) ||
         e.contact1_email?.toLowerCase().includes(q) ||
         e.license_number?.toLowerCase().includes(q)
@@ -2198,7 +2228,7 @@ function SupplierSection({ company, showToast, currentUser }) {
     sortField, sortDir
   )
 
-  const hasPresetStates = !!(STATES_BY_COUNTRY[form.country]?.length)
+  const hasPresetStates = !!(STATES_BY_COUNTRY[form.bill_to_country]?.length)
 
   return (
     <div className="space-y-4">
@@ -2294,24 +2324,27 @@ function SupplierSection({ company, showToast, currentUser }) {
                     Supplier Name <SortIcon field="name" sortField={sortField} sortDir={sortDir} />
                   </th>
                   {[
-                    { label: 'Code',           field: 'supplier_code' },
-                    { label: 'VAT Number',     field: null },
-                    { label: 'Address',        field: null },
-                    { label: 'Website',        field: null },
-                    { label: 'Contact 1 Name', field: null },
-                    { label: 'Contact 1 Email',field: null },
-                    { label: 'Contact 1 Phone',field: null },
-                    { label: 'Contact 2 Name', field: null },
-                    { label: 'Contact 2 Email',field: null },
-                    { label: 'Contact 2 Phone',field: null },
-                    { label: 'Contact 3 Name', field: null },
-                    { label: 'Contact 3 Email',field: null },
-                    { label: 'Contact 3 Phone',field: null },
-                    { label: 'Approved Date',  field: 'approved_date' },
-                    { label: 'Valid Through',  field: 'valid_through' },
-                    { label: 'License No.',    field: null },
-                    { label: 'Remarks',        field: null },
-                    { label: 'Added',          field: 'created_at' },
+                    { label: 'Code',             field: 'supplier_code' },
+                    { label: 'VAT Number',       field: null },
+                    { label: 'Address',          field: null },
+                    { label: 'Country',          field: 'bill_to_country' },
+                    { label: 'City',             field: null },
+                    { label: 'Website',          field: null },
+                    { label: 'Contact 1 Name',   field: null },
+                    { label: 'Contact 1 Email',  field: null },
+                    { label: 'Contact 1 Phone',  field: null },
+                    { label: 'Contact 2 Name',   field: null },
+                    { label: 'Contact 2 Email',  field: null },
+                    { label: 'Contact 2 Phone',  field: null },
+                    { label: 'Contact 3 Name',   field: null },
+                    { label: 'Contact 3 Email',  field: null },
+                    { label: 'Contact 3 Phone',  field: null },
+                    { label: 'Approved Date',    field: 'approved_date' },
+                    { label: 'Valid Through',    field: 'valid_through' },
+                    { label: 'License No.',      field: null },
+                    { label: 'License Validity', field: 'license_validity' },
+                    { label: 'Remarks',          field: null },
+                    { label: 'Added',            field: 'created_at' },
                   ].map(({ label, field }) => (
                     <th key={label}
                         className={`text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap bg-gray-50${field ? ' cursor-pointer select-none' : ''}`}
@@ -2344,9 +2377,11 @@ function SupplierSection({ company, showToast, currentUser }) {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{entry.vat_number || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap max-w-[160px]">
-                      {(() => { const addr = [entry.address1, entry.state, entry.country, entry.postal_code].filter(Boolean).join(', '); return addr ? <span className="block truncate" title={addr}>{addr}</span> : <span className="text-gray-300">—</span> })()}
+                    <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[180px]">
+                      <RemarksCell text={entry.bill_to_address} />
                     </td>
+                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.bill_to_country || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.bill_to_city || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       {entry.website
                         ? <a href={entry.website.startsWith('http') ? entry.website : `https://${entry.website}`}
@@ -2368,6 +2403,7 @@ function SupplierSection({ company, showToast, currentUser }) {
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.approved_date)}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.valid_through)}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs whitespace-nowrap">{entry.license_number || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(entry.license_validity)}</td>
                     <td className="px-5 py-3.5 text-gray-600 text-xs max-w-[160px]">
                       <RemarksCell text={entry.remarks} />
                     </td>
@@ -2449,44 +2485,44 @@ function SupplierSection({ company, showToast, currentUser }) {
               </Field>
 
               {/* Address */}
-              <div className="border border-gray-100 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Address</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Country">
-                    <select className={selectCls(false)} value={form.country} onChange={e => handleCountryChange(e.target.value)}>
-                      <option value="">Select country…</option>
-                      {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="State / Province">
-                    <div className="flex gap-2">
-                      {hasPresetStates && !freeTextState ? (
-                        <select className={`${selectCls(false)} flex-1`} value={form.state} onChange={e => setField('state', e.target.value)}>
-                          <option value="">Select state…</option>
-                          {STATES_BY_COUNTRY[form.country].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      ) : (
-                        <input className={`${inputCls(false)} flex-1`} value={form.state} placeholder="Enter state…"
-                          onChange={e => setField('state', e.target.value)} />
-                      )}
-                      {hasPresetStates && (
-                        <button type="button" title={freeTextState ? 'Switch to dropdown' : 'Switch to free text'}
-                          onClick={() => { setFreeTextState(p => !p); setField('state', '') }}
-                          className="px-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition text-sm">✎</button>
-                      )}
-                    </div>
-                  </Field>
+              <div className="space-y-3">
+                <Field label="Street / Building">
+                  <textarea className={`${inputCls(false)} resize-none`} rows={2} value={form.bill_to_address}
+                    placeholder="Street / building…"
+                    onChange={e => setField('bill_to_address', e.target.value)} />
+                </Field>
+                <Field label="Country">
+                  <select className={selectCls(false)} value={form.bill_to_country} onChange={e => handleCountryChange(e.target.value)}>
+                    <option value="">Select country…</option>
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </Field>
+                <Field label="State / Province">
+                  <div className="flex gap-2">
+                    {hasPresetStates && !freeTextState ? (
+                      <select className={`${selectCls(false)} flex-1`} value={form.bill_to_state} onChange={e => setField('bill_to_state', e.target.value)}>
+                        <option value="">Select state…</option>
+                        {STATES_BY_COUNTRY[form.bill_to_country].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    ) : (
+                      <input className={`${inputCls(false)} flex-1`} value={form.bill_to_state} placeholder="Enter state…"
+                        onChange={e => setField('bill_to_state', e.target.value)} />
+                    )}
+                    {hasPresetStates && (
+                      <button type="button" title={freeTextState ? 'Switch to dropdown' : 'Switch to free text'}
+                        onClick={() => { setFreeTextState(p => !p); setField('bill_to_state', '') }}
+                        className="px-2.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition text-sm">✎</button>
+                    )}
+                  </div>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
                   <Field label="City">
-                    <input className={inputCls(false)} value={form.address1} placeholder="e.g. New York"
-                      list="supplier-cities" autoComplete="off"
-                      onChange={e => setField('address1', e.target.value)} />
-                    <datalist id="supplier-cities">
-                      {(CITIES_BY_COUNTRY[form.country] || []).map(c => <option key={c} value={c} />)}
-                    </datalist>
+                    <input className={inputCls(false)} value={form.bill_to_city} placeholder="e.g. New York"
+                      onChange={e => setField('bill_to_city', e.target.value)} />
                   </Field>
                   <Field label="Postal Code">
-                    <input className={inputCls(false)} value={form.postal_code} placeholder="e.g. 10001"
-                      onChange={e => setField('postal_code', e.target.value)} />
+                    <input className={inputCls(false)} value={form.bill_to_postal_code} placeholder="e.g. 10001"
+                      onChange={e => setField('bill_to_postal_code', e.target.value)} />
                   </Field>
                 </div>
               </div>
@@ -2543,11 +2579,17 @@ function SupplierSection({ company, showToast, currentUser }) {
                 </Field>
               </div>
 
-              {/* License Number */}
-              <Field label="License Number">
-                <input className={inputCls(false)} value={form.license_number} placeholder="e.g. LIC-2024-00123"
-                  onChange={e => setField('license_number', e.target.value)} />
-              </Field>
+              {/* License */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="License Number">
+                  <input className={inputCls(false)} value={form.license_number} placeholder="e.g. LIC-2024-00123"
+                    onChange={e => setField('license_number', e.target.value)} />
+                </Field>
+                <Field label="License Validity">
+                  <input type="date" className={inputCls(false)} value={form.license_validity}
+                    onChange={e => setField('license_validity', e.target.value)} />
+                </Field>
+              </div>
 
               {/* Remarks */}
               <Field label="Remarks">

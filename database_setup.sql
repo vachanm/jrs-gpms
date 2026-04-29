@@ -65,54 +65,72 @@ alter table customers_master add column if not exists ship_to_country     text;
 alter table customers_master add column if not exists ship_to_state       text;
 alter table customers_master add column if not exists ship_to_city        text;
 alter table customers_master add column if not exists ship_to_postal_code text;
+alter table customers_master add column if not exists license_number      text;
+alter table customers_master add column if not exists license_validity    date;
 
 -- Vendor / Supplier Master
 create table if not exists vendors_master (
-  id             uuid primary key default gen_random_uuid(),
-  name           text not null,
-  address1       text,
-  address2       text,
-  country        text,
-  state          text,
-  postal_code    text,
-  website        text,
-  contact1_name  text,
-  contact1_email text,
-  contact1_phone text,
-  contact2_name  text,
-  contact2_email text,
-  contact2_phone text,
-  contact3_name  text,
-  contact3_email text,
-  contact3_phone text,
-  approved_date  date,
-  valid_through  date,
-  license_number text,
-  remarks        text,
-  company        text,
-  created_at     timestamptz default now()
+  id                  uuid primary key default gen_random_uuid(),
+  name                text not null,
+  supplier_code       text,
+  vat_number          text,
+  bill_to_address     text,
+  bill_to_country     text,
+  bill_to_state       text,
+  bill_to_city        text,
+  bill_to_postal_code text,
+  ship_to_address     text,
+  ship_to_country     text,
+  ship_to_state       text,
+  ship_to_city        text,
+  ship_to_postal_code text,
+  website             text,
+  contact1_name       text,
+  contact1_email      text,
+  contact1_phone      text,
+  contact2_name       text,
+  contact2_email      text,
+  contact2_phone      text,
+  contact3_name       text,
+  contact3_email      text,
+  contact3_phone      text,
+  approved_date       date,
+  valid_through       date,
+  license_number      text,
+  license_validity    date,
+  remarks             text,
+  company             text,
+  created_at          timestamptz default now()
 );
 
 -- Migration: add new columns if vendors_master already exists
-alter table vendors_master add column if not exists address1       text;
-alter table vendors_master add column if not exists address2       text;
-alter table vendors_master add column if not exists country        text;
-alter table vendors_master add column if not exists state          text;
-alter table vendors_master add column if not exists postal_code    text;
-alter table vendors_master add column if not exists website        text;
-alter table vendors_master add column if not exists contact1_name  text;
-alter table vendors_master add column if not exists contact1_email text;
-alter table vendors_master add column if not exists contact1_phone text;
-alter table vendors_master add column if not exists contact2_name  text;
-alter table vendors_master add column if not exists contact2_email text;
-alter table vendors_master add column if not exists contact2_phone text;
-alter table vendors_master add column if not exists contact3_name  text;
-alter table vendors_master add column if not exists contact3_email text;
-alter table vendors_master add column if not exists contact3_phone text;
-alter table vendors_master add column if not exists approved_date  date;
-alter table vendors_master add column if not exists valid_through  date;
-alter table vendors_master add column if not exists license_number text;
-alter table vendors_master add column if not exists remarks        text;
+alter table vendors_master add column if not exists supplier_code       text;
+alter table vendors_master add column if not exists vat_number          text;
+alter table vendors_master add column if not exists bill_to_address     text;
+alter table vendors_master add column if not exists bill_to_country     text;
+alter table vendors_master add column if not exists bill_to_state       text;
+alter table vendors_master add column if not exists bill_to_city        text;
+alter table vendors_master add column if not exists bill_to_postal_code text;
+alter table vendors_master add column if not exists ship_to_address     text;
+alter table vendors_master add column if not exists ship_to_country     text;
+alter table vendors_master add column if not exists ship_to_state       text;
+alter table vendors_master add column if not exists ship_to_city        text;
+alter table vendors_master add column if not exists ship_to_postal_code text;
+alter table vendors_master add column if not exists website             text;
+alter table vendors_master add column if not exists contact1_name       text;
+alter table vendors_master add column if not exists contact1_email      text;
+alter table vendors_master add column if not exists contact1_phone      text;
+alter table vendors_master add column if not exists contact2_name       text;
+alter table vendors_master add column if not exists contact2_email      text;
+alter table vendors_master add column if not exists contact2_phone      text;
+alter table vendors_master add column if not exists contact3_name       text;
+alter table vendors_master add column if not exists contact3_email      text;
+alter table vendors_master add column if not exists contact3_phone      text;
+alter table vendors_master add column if not exists approved_date       date;
+alter table vendors_master add column if not exists valid_through       date;
+alter table vendors_master add column if not exists license_number      text;
+alter table vendors_master add column if not exists license_validity    date;
+alter table vendors_master add column if not exists remarks             text;
 
 -- Product Master
 create table if not exists products_master (

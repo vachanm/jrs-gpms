@@ -81,22 +81,20 @@ function App() {
     localStorage.setItem('jrs_company', JSON.stringify(company))
     setCurrentUser(user)
     setSelectedCompany(company)
-    if (!ADMIN_USERS.includes(user.name)) {
-      try {
-        await supabase.from('audit_logs').insert([{
-          actor_name: user.name,
-          actor_role: user.role || 'employee',
-          company,
-          module: 'Session',
-          action: 'login',
-          details: { company },
-        }])
-      } catch { void 0 }
-    }
+    try {
+      await supabase.from('audit_logs').insert([{
+        actor_name: user.name,
+        actor_role: user.role || 'employee',
+        company,
+        module: 'Session',
+        action: 'login',
+        details: { company },
+      }])
+    } catch { void 0 }
   }
 
   async function handleLogout() {
-    if (currentUser && !ADMIN_USERS.includes(currentUser.name)) {
+    if (currentUser) {
       try {
         await supabase.from('audit_logs').insert([{
           actor_name: currentUser.name,
@@ -1037,7 +1035,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
 
           {/* ERP parent */}
           <button
-            onClick={() => collapsed ? setActivePage('erp-estimates') : setErpOpen(v => !v)}
+            onClick={() => { if (collapsed) { setCollapsed(false); setErpOpen(true) } else { setErpOpen(v => !v) } }}
             title={collapsed ? 'ERP' : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
@@ -1082,7 +1080,7 @@ function Dashboard({ activePage, setActivePage, currentUser, setCurrentUser, sel
 
           {/* Masters parent */}
           <button
-            onClick={() => collapsed ? setActivePage('masters-customers') : setMastersOpen(v => !v)}
+            onClick={() => { if (collapsed) { setCollapsed(false); setMastersOpen(true) } else { setMastersOpen(v => !v) } }}
             title={collapsed ? 'Masters' : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
