@@ -62,6 +62,8 @@ export default function Estimates({ company, currentUser }) {
   const [sortDir, setSortDir]     = useState('desc')
   const [editingEstimate, setEditingEstimate] = useState(null)
   const [masterCustomers, setMasterCustomers] = useState([])
+  const [fixingHsn, setFixingHsn] = useState(false)
+  const [hsnFixResult, setHsnFixResult] = useState(null)
   const statusBtnRefs = useRef({})
 
   function toggleSort(f) {
@@ -85,6 +87,45 @@ export default function Estimates({ company, currentUser }) {
   useEffect(() => {
     supabase.from('customers_master').select('id,name,bill_to_address,bill_to_city,bill_to_state,bill_to_postal_code,bill_to_country,ship_to_address,ship_to_city,ship_to_state,ship_to_postal_code,ship_to_country').eq('company', company).then(({ data }) => setMasterCustomers(data || []))
   }, [company])
+
+  async function handleFixHsnCodes() {
+    setFixingHsn(true)
+    setHsnFixResult(null)
+    const { data: products } = await supabase.from('products_master').select('name,hsn_code').eq('company', company)
+    const productMap = {}
+    ;(products || []).forEach(p => { if (p.name) productMap[p.name.toLowerCase()] = p.hsn_code || '' })
+
+    const toUpdate = estimates.filter(e => e.estimate_data)
+    let updatedCount = 0
+
+    for (const est of toUpdate) {
+      const data = typeof est.estimate_data === 'string' ? JSON.parse(est.estimate_data) : { ...est.estimate_data }
+      let changed = false
+      const newItems = (data.lineItems || []).map(item => {
+        // migrate old htsCode key to hsnCode
+        if ('htsCode' in item && !('hsnCode' in item)) {
+          item = { ...item, hsnCode: item.htsCode }
+          delete item.htsCode
+          changed = true
+        }
+        if (item.type === 'product' && !item.hsnCode) {
+          const hsn = productMap[item.description?.toLowerCase()]
+          if (hsn) { item = { ...item, hsnCode: hsn }; changed = true }
+        }
+        return item
+      })
+      if (changed) {
+        data.lineItems = newItems
+        await supabase.from('estimates').update({ estimate_data: JSON.stringify(data) }).eq('id', est.id)
+        updatedCount++
+      }
+    }
+
+    setFixingHsn(false)
+    setHsnFixResult(updatedCount)
+    await fetchEstimates()
+    setTimeout(() => setHsnFixResult(null), 4000)
+  }
 
   async function handleDownload(est) {
     if (!est.estimate_data) return
@@ -198,6 +239,23 @@ export default function Estimates({ company, currentUser }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           Refresh
+        </button>
+        <button
+          onClick={handleFixHsnCodes}
+          disabled={fixingHsn}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl transition disabled:opacity-50"
+        >
+          {fixingHsn ? (
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          {hsnFixResult !== null ? `Fixed ${hsnFixResult} estimate${hsnFixResult !== 1 ? 's' : ''}` : 'Fix HSN Codes'}
         </button>
       </div>
 
