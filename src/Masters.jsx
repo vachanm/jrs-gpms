@@ -2707,6 +2707,17 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
   const [sortDir, setSortDir]         = useState('desc')
   const [importFile, setImportFile]   = useState(null)
   const [fixingCodes, setFixingCodes] = useState(false)
+  const [removingDups, setRemovingDups] = useState(false)
+  const hasDuplicates = (() => {
+    const seen = new Set()
+    return entries.some(r => {
+      const key = r.name?.trim().toLowerCase()
+      if (!key) return false
+      if (seen.has(key)) return true
+      seen.add(key)
+      return false
+    })
+  })()
   const hasBrokenCodes = (() => {
     const seen = new Set()
     return entries.some(r => {
@@ -2740,6 +2751,38 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
     if (fixed > 0) await fetchEntries()
     setFixingCodes(false)
     showToast(fixed > 0 ? `Fixed ${fixed} product code${fixed !== 1 ? 's' : ''}` : 'No codes needed fixing', fixed > 0 ? 'success' : 'info')
+  }
+
+  async function removeDuplicates() {
+    setRemovingDups(true)
+    const { data: all } = await supabase.from('products_master').select('*').eq('company', company)
+    const groups = {}
+    for (const r of (all || [])) {
+      const key = r.name?.trim().toLowerCase()
+      if (!key) continue
+      if (!groups[key]) groups[key] = []
+      groups[key].push(r)
+    }
+    const toDelete = []
+    for (const rows of Object.values(groups)) {
+      if (rows.length < 2) continue
+      rows.sort((a, b) => {
+        const score = r => Object.values(r).filter(v => v !== null && v !== '' && v !== undefined).length
+        const diff = score(b) - score(a)
+        if (diff !== 0) return diff
+        return new Date(a.created_at) - new Date(b.created_at)
+      })
+      toDelete.push(...rows.slice(1).map(r => r.id))
+    }
+    if (toDelete.length > 0) {
+      const BATCH = 100
+      for (let i = 0; i < toDelete.length; i += BATCH) {
+        await supabase.from('products_master').delete().in('id', toDelete.slice(i, i + BATCH))
+      }
+      await fetchEntries()
+    }
+    setRemovingDups(false)
+    showToast(toDelete.length > 0 ? `Removed ${toDelete.length} duplicate${toDelete.length !== 1 ? 's' : ''}` : 'No duplicates found', toDelete.length > 0 ? 'success' : 'info')
   }
 
   function toggleSort(f) {
@@ -2880,6 +2923,13 @@ function ProductSection({ company, showToast, currentUser, isAdmin }) {
             className="flex items-center gap-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-60 text-amber-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             {fixingCodes ? 'Fixing…' : 'Fix Codes'}
+          </button>
+          )}
+          {hasDuplicates && (
+          <button onClick={removeDuplicates} disabled={removingDups}
+            className="flex items-center gap-2 border border-red-300 bg-red-50 hover:bg-red-100 disabled:opacity-60 text-red-700 px-4 py-2.5 rounded-xl font-medium text-sm transition shadow-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            {removingDups ? 'Removing…' : 'Remove Duplicates'}
           </button>
           )}
           <button onClick={openAdd}
