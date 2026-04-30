@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from './supabase'
 import { logActivity } from './auditLogger'
 import { generateEstimatePDF } from './EstimateModal'
+import EstimateModal from './EstimateModal'
 
 const STATUS_OPTIONS = ['Draft', 'Sent', 'Accepted', 'Rejected']
 
@@ -59,6 +60,8 @@ export default function Estimates({ company, currentUser }) {
   const [statusDropPos, setStatusDropPos] = useState(null)
   const [sortField, setSortField] = useState('created_at')
   const [sortDir, setSortDir]     = useState('desc')
+  const [editingEstimate, setEditingEstimate] = useState(null)
+  const [masterCustomers, setMasterCustomers] = useState([])
   const statusBtnRefs = useRef({})
 
   function toggleSort(f) {
@@ -78,6 +81,10 @@ export default function Estimates({ company, currentUser }) {
   }
 
   useEffect(() => { fetchEstimates() }, [company])
+
+  useEffect(() => {
+    supabase.from('customers_master').select('id,name,bill_to_address,bill_to_city,bill_to_state,bill_to_postal_code,bill_to_country,ship_to_address,ship_to_city,ship_to_state,ship_to_postal_code,ship_to_country').eq('company', company).then(({ data }) => setMasterCustomers(data || []))
+  }, [company])
 
   async function handleDownload(est) {
     if (!est.estimate_data) return
@@ -279,6 +286,16 @@ export default function Estimates({ company, currentUser }) {
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
+                        onClick={() => setEditingEstimate(est)}
+                        title="Edit"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit
+                      </button>
+                      <button
                         onClick={() => handleDownload(est)}
                         disabled={downloading === est.id || !est.estimate_data}
                         title="Download PDF"
@@ -315,6 +332,20 @@ export default function Estimates({ company, currentUser }) {
           </div>
         )}
       </div>
+
+      {editingEstimate && (
+        <EstimateModal
+          open={!!editingEstimate}
+          onClose={() => setEditingEstimate(null)}
+          editEstimate={editingEstimate}
+          onSaved={() => { setEditingEstimate(null); fetchEstimates() }}
+          selectedInquiries={[]}
+          currentUser={currentUser}
+          company={company}
+          masterCustomers={masterCustomers}
+          masterProducts={[]}
+        />
+      )}
 
       {/* Status dropdown portal */}
       {openStatusId && statusDropPos && createPortal(

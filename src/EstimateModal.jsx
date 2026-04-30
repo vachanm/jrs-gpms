@@ -443,11 +443,11 @@ function ModeToggle({ mode, onChange }) {
   )
 }
 
-export default function EstimateModal({ open, onClose, selectedInquiries = [], currentUser, company, masterCustomers = [], masterProducts = [] }) {
+export default function EstimateModal({ open, onClose, selectedInquiries = [], currentUser, company, masterCustomers = [], masterProducts = [], editEstimate = null, onSaved }) {
 
   const estNum = useRef(generateEstimateNumber())
   const validTillRef = useRef(null)
-  const today = new Date().toISOString().split('T')[0]
+  const [estimateDate, setEstimateDate] = useState(new Date().toISOString().split('T')[0])
 
   const [billToMode, setBillToMode] = useState('pick')
   const [billToName, setBillToName] = useState('')
@@ -490,11 +490,59 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
 
   useEffect(() => {
     if (!open) return
+
+    const cfg = COMPANY_CONFIG[resolveCompany(company)]
+    const companyKey = resolveCompany(company)
+
+    function loadCompanyFromDB() {
+      supabase.from('company_master').select('*').then(({ data: cmRows }) => {
+        const cm = cmRows?.find(row => row.company && resolveCompany(row.company) === companyKey) || null
+        if (cm) {
+          const addrParts = [cm.address1, cm.address2, cm.city, cm.state, cm.postal_code, cm.country].filter(Boolean)
+          setCoAddress(addrParts.join(', '))
+          setCoWebsite([cm.website, cm.phone].filter(Boolean).join(' | '))
+        } else {
+          setCoAddress(cfg.address)
+          setCoWebsite(cfg.website)
+        }
+        setBankBeneficiary(cm?.bank_account_name || '')
+        setBankName(cm?.bank_name || '')
+        setBankAddr(cm?.bank_address || '')
+        setBankAccount(cm?.bank_account_number || '')
+        setBankRoutingACH(cm?.bank_routing_number || '')
+        setBankRoutingWire(cm?.bank_routing_wire || '')
+        setBankSwift(cm?.bank_swift || '')
+        setBankIban(cm?.bank_iban || '')
+      })
+    }
+
+    if (editEstimate) {
+      const d = typeof editEstimate.estimate_data === 'string'
+        ? JSON.parse(editEstimate.estimate_data)
+        : editEstimate.estimate_data
+
+      estNum.current = editEstimate.estimate_number
+      setEstimateDate(editEstimate.date || new Date().toISOString().split('T')[0])
+
+      setBillToMode('type'); setBillToName(d.billToName || ''); setBillToAddr1(d.billToAddr1 || ''); setBillToAddr2(d.billToAddr2 || ''); setBillToCountry(d.billToCountry || '')
+      setShipToMode('type'); setShipToName(d.shipToName || ''); setShipToAddr1(d.shipToAddr1 || ''); setShipToAddr2(d.shipToAddr2 || ''); setShipToCountry(d.shipToCountry || '')
+      setPoNo(d.poNo || '')
+      setPayTermsMode('type'); setPayTerms('Net 30'); setPayTermsManual(d.effectivePayTerms || '')
+      setValidTill(d.validTill || '')
+      setIncotermsMode('type'); setIncoterms('ExW'); setIncotermsManual(d.effectiveIncoterms || '')
+      setNote(d.note || '')
+      setBankOpen(false)
+      setToast(null)
+      loadCompanyFromDB()
+      setLineItems((d.lineItems || []).map((item, i) => ({ ...item, _key: item._key || `edit-${i}` })))
+      return
+    }
+
     estNum.current = generateEstimateNumber()
+    setEstimateDate(new Date().toISOString().split('T')[0])
     setBillToMode('pick'); setBillToName(''); setBillToAddr1(''); setBillToAddr2(''); setBillToCountry('')
     setShipToMode('pick'); setShipToName(''); setShipToAddr1(''); setShipToAddr2(''); setShipToCountry('')
 
-    // Auto-fill addresses from the first inquiry's customer
     if (selectedInquiries.length > 0 && selectedInquiries[0].customer) {
       const customerName = selectedInquiries[0].customer
       const c = masterCustomers.find(x => x.name === customerName)
@@ -514,29 +562,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     setNote('')
     setBankOpen(false)
     setToast(null)
-
-    // Load company profile strictly from DB — no hardcoded fallback for bank details
-    const cfg = COMPANY_CONFIG[resolveCompany(company)]
-    const companyKey = resolveCompany(company)
-    supabase.from('company_master').select('*').then(({ data: cmRows }) => {
-      const cm = cmRows?.find(row => row.company && resolveCompany(row.company) === companyKey) || null
-      if (cm) {
-        const addrParts = [cm.address1, cm.address2, cm.city, cm.state, cm.postal_code, cm.country].filter(Boolean)
-        setCoAddress(addrParts.join(', '))
-        setCoWebsite([cm.website, cm.phone].filter(Boolean).join(' | '))
-      } else {
-        setCoAddress(cfg.address)
-        setCoWebsite(cfg.website)
-      }
-      setBankBeneficiary(cm?.bank_account_name || '')
-      setBankName(cm?.bank_name || '')
-      setBankAddr(cm?.bank_address || '')
-      setBankAccount(cm?.bank_account_number || '')
-      setBankRoutingACH(cm?.bank_routing_number || '')
-      setBankRoutingWire(cm?.bank_routing_wire || '')
-      setBankSwift(cm?.bank_swift || '')
-      setBankIban(cm?.bank_iban || '')
-    })
+    loadCompanyFromDB()
 
     setLineItems(
       selectedInquiries.map((inq, i) => {
@@ -559,7 +585,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
         }
       })
     )
-  }, [open, company])
+  }, [open, company, editEstimate?.id])
 
   if (!open) return null
 
@@ -619,7 +645,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
     try {
       const data = {
         estNum: estNum.current,
-        today,
+        today: estimateDate,
         coName,
         coAddress,
         coWebsite,
@@ -640,26 +666,46 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
 
       await generateEstimatePDF(data)
 
-      const { error: saveError } = await supabase.from('estimates').insert({
-        estimate_number: estNum.current,
-        company,
-        customer_name: billToName,
-        sales_rep: currentUser?.name,
-        date: today,
-        valid_till: validTill || null,
-        total_amount: grandTotal,
-        currency: primaryCurrency,
-        status: 'Draft',
-        estimate_data: JSON.stringify(data),
-      })
+      if (editEstimate) {
+        const { error: saveError } = await supabase.from('estimates').update({
+          customer_name: billToName,
+          sales_rep: currentUser?.name,
+          valid_till: validTill || null,
+          total_amount: grandTotal,
+          currency: primaryCurrency,
+          estimate_data: JSON.stringify(data),
+        }).eq('id', editEstimate.id)
 
-      if (saveError) {
-        setToast({ type: 'warning', msg: 'PDF saved — could not save to database.' })
+        if (saveError) {
+          setToast({ type: 'warning', msg: 'PDF downloaded — could not save changes to database.' })
+          setTimeout(() => setToast(null), 4000)
+        } else {
+          setToast({ type: 'success', msg: 'Estimate updated successfully.' })
+          logActivity({ actor: currentUser, company, module: 'Estimates', action: 'edited', recordId: editEstimate.id, details: { customer: billToName } })
+          setTimeout(() => { setToast(null); onSaved?.() }, 1500)
+        }
       } else {
-        setToast({ type: 'success', msg: 'Estimate saved successfully.' })
-        logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'generated_estimate', details: { customer: billToName, inquiry_count: selectedInquiries.length } })
+        const { error: saveError } = await supabase.from('estimates').insert({
+          estimate_number: estNum.current,
+          company,
+          customer_name: billToName,
+          sales_rep: currentUser?.name,
+          date: estimateDate,
+          valid_till: validTill || null,
+          total_amount: grandTotal,
+          currency: primaryCurrency,
+          status: 'Draft',
+          estimate_data: JSON.stringify(data),
+        })
+
+        if (saveError) {
+          setToast({ type: 'warning', msg: 'PDF saved — could not save to database.' })
+        } else {
+          setToast({ type: 'success', msg: 'Estimate saved successfully.' })
+          logActivity({ actor: currentUser, company, module: 'Inquiries', action: 'generated_estimate', details: { customer: billToName, inquiry_count: selectedInquiries.length } })
+        }
+        setTimeout(() => setToast(null), 4000)
       }
-      setTimeout(() => setToast(null), 4000)
     } finally {
       setGenerating(false)
     }
@@ -677,9 +723,9 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
           {/* ── Modal Header ── */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Generate Estimate</h2>
+              <h2 className="text-xl font-bold text-gray-900">{editEstimate ? 'Edit Estimate' : 'Generate Estimate'}</h2>
               <p className="text-sm text-gray-400 mt-0.5">
-                #{estNum.current} · {formatDateDisplay(today)} · {coName}
+                #{estNum.current} · {formatDateDisplay(estimateDate)} · {coName}
               </p>
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition">
@@ -696,7 +742,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Estimate Info</p>
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  ['Date', formatDateDisplay(today)],
+                  ['Date', formatDateDisplay(estimateDate)],
                   ['Estimate #', estNum.current],
                   ['Sales Rep', currentUser?.name || '—'],
                 ].map(([label, val]) => (
@@ -1052,7 +1098,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                     </svg>
-                    Generating…
+                    {editEstimate ? 'Saving…' : 'Generating…'}
                   </>
                 ) : (
                   <>
@@ -1060,7 +1106,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
-                    Generate PDF
+                    {editEstimate ? 'Save & Download PDF' : 'Generate PDF'}
                   </>
                 )}
               </button>
