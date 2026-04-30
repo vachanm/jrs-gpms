@@ -274,7 +274,7 @@ export async function generateEstimatePDF(data) {
       item.manufacturer && ['Manufacturer', item.manufacturer],
       item.batchNo      && ['Batch #',      item.batchNo],
       item.expiry       && ['Expiry',       item.expiry],
-      item.htsCode      && ['HTS Code',     item.htsCode],
+      item.hsnCode      && ['HSN Code',     item.hsnCode],
     ].filter(Boolean)
 
     const subRowCount = subFields.length > 0 ? Math.ceil(subFields.length / SUB_CPR) : 0
@@ -577,7 +577,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
           manufacturer: inq.manufacturer || prod?.manufacturer || '',
           batchNo: '',
           expiry: '',
-          htsCode: '',
+          hsnCode: prod?.hsn_code || '',
           qty: String(inq.quantity ?? ''),
           um: 'ea',
           unitPrice: String(inq.quote_price ?? ''),
@@ -625,7 +625,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
   function addProductRow() {
     setLineItems(prev => [...prev, {
       _key: `extra-${Date.now()}`, type: 'product',
-      item: '', description: '', ndcCode: '', packSize: '', manufacturer: '', batchNo: '', expiry: '', htsCode: '',
+      item: '', description: '', ndcCode: '', packSize: '', manufacturer: '', batchNo: '', expiry: '', hsnCode: '',
       qty: '', um: 'ea', unitPrice: '', currency: primaryCurrency,
     }])
   }
@@ -633,7 +633,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
   function addChargeRow() {
     setLineItems(prev => [...prev, {
       _key: `charge-${Date.now()}`, type: 'charge',
-      item: '', description: '', ndcCode: '', packSize: '', manufacturer: '', batchNo: '', expiry: '', htsCode: '',
+      item: '', description: '', ndcCode: '', packSize: '', manufacturer: '', batchNo: '', expiry: '', hsnCode: '',
       qty: '1', um: '', unitPrice: '', currency: primaryCurrency,
     }])
   }
@@ -1008,7 +1008,7 @@ export default function EstimateModal({ open, onClose, selectedInquiries = [], c
                               className="w-full px-1.5 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
                             {!isCharge && (
                               <div className="grid grid-cols-3 gap-1 mt-1.5">
-                                {[['ndcCode','NDC#'],['packSize','Pack Size'],['manufacturer','Manufacturer'],['batchNo','Batch#'],['expiry','Expiry'],['htsCode','HTS Code']].map(([f, ph]) => (
+                                {[['ndcCode','NDC#'],['packSize','Pack Size'],['manufacturer','Manufacturer'],['batchNo','Batch#'],['expiry','Expiry'],['hsnCode','HSN Code']].map(([f, ph]) => (
                                   <input key={f} value={item[f]} onChange={e => updateItem(idx, f, e.target.value)}
                                     placeholder={ph}
                                     className="px-1.5 py-0.5 border border-gray-100 rounded text-[10px] text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-gray-50/70" />

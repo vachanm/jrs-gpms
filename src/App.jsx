@@ -159,10 +159,10 @@ function App() {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
   }
 
-  // Auto-logout after 10 minutes of inactivity
+  // Auto-logout after 20 minutes of inactivity
   useEffect(() => {
     if (!isLoggedIn) return
-    const TIMEOUT = 10 * 60 * 1000
+    const TIMEOUT = 20 * 60 * 1000
     let timer = setTimeout(handleLogout, TIMEOUT)
     const reset = () => { clearTimeout(timer); timer = setTimeout(handleLogout, TIMEOUT) }
     const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click']

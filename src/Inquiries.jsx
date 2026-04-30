@@ -1866,7 +1866,8 @@ export default function Inquiries({ company, currentUser, prefillCustomer, onCle
                       <div className="flex-1 min-w-0">
                         <MasterSelect value={form.product} err={false}
                           onChange={handleProductChange}
-                          options={masterProducts} placeholder="Select product…" />
+                          options={form.sourcing_country ? masterProducts.filter(p => p.country_of_origin === form.sourcing_country) : masterProducts}
+                          placeholder={form.sourcing_country ? `Products from ${form.sourcing_country}…` : 'Select product…'} />
                       </div>
                       <button type="button" onClick={() => setQuickAdd({ type: 'product' })}
                         className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 text-xs font-medium transition whitespace-nowrap">
